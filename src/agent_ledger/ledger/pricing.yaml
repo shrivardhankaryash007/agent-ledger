@@ -1,0 +1,10 @@
+# Versioned pricing table (USD per 1k tokens). Source: ~/dev/standards/agentic-os/MODEL-PRICING.md,
+# verified 2026-06-13 against the Claude API pricing table. Update whenever
+# that file updates; do not let the two drift.
+version: 1
+skus:
+  claude-fable-5: { input: 0.010, output: 0.050, vendor: anthropic }
+  claude-opus-4-8: { input: 0.005, output: 0.025, vendor: anthropic }
+  claude-opus-4-7: { input: 0.005, output: 0.025, vendor: anthropic }
+  claude-sonnet-4-6: { input: 0.003, output: 0.015, vendor: anthropic }
+  claude-haiku-4-5: { input: 0.001, output: 0.005, vendor: anthropic }
