@@ -19,21 +19,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-import yaml
-
 from agent_ledger.ledger.models import CallRecord
+from agent_ledger.ledger.pricing import cost_usd, load_pricing
 from agent_ledger.ledger.repository import migrate, upsert
 
 SYNTHETIC_MODEL = "<synthetic>"
-PRICING_PATH = Path(__file__).parent.parent / "ledger" / "pricing.yaml"
-
-
-@dataclass(frozen=True)
-class Price:
-    """Per-thousand-token rates for one model."""
-
-    input_rate: float
-    output_rate: float
 
 
 @dataclass
@@ -45,32 +35,6 @@ class Bucket:
     out_tokens: int = 0
     calls: int = 0
     last_ts: str = ""
-
-
-def _pricing() -> dict[str, Price]:
-    """Load and validate the versioned local pricing table."""
-
-    raw: object = yaml.safe_load(PRICING_PATH.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError("pricing table must be a mapping")
-    root = cast("dict[object, object]", raw)
-    sku_values = root.get("skus")
-    if not isinstance(sku_values, dict):
-        raise ValueError("pricing table must define a 'skus' mapping")
-
-    prices: dict[str, Price] = {}
-    for model, value in cast("dict[object, object]", sku_values).items():
-        if not isinstance(model, str) or not isinstance(value, dict):
-            raise ValueError("each pricing entry must map a model name to rates")
-        rates = cast("dict[object, object]", value)
-        input_rate = rates.get("input")
-        output_rate = rates.get("output")
-        if not isinstance(input_rate, (int, float)) or not isinstance(
-            output_rate, (int, float)
-        ):
-            raise ValueError(f"pricing entry for {model!r} has invalid rates")
-        prices[model] = Price(float(input_rate), float(output_rate))
-    return prices
 
 
 def _timestamp(raw: str, path: Path) -> datetime:
@@ -155,11 +119,10 @@ def parse_transcript(path: Path) -> list[CallRecord]:
         if timestamp > bucket.last_ts:
             bucket.last_ts = timestamp
 
-    prices = _pricing()
+    prices = load_pricing()
     records: list[CallRecord] = []
     for model, bucket in buckets.items():
-        price = prices.get(model)
-        if price is None:
+        if model not in prices:
             raise ValueError(f"no pricing configured for transcript model {model!r}")
         capability_class, vendor = classify(model)
         records.append(
@@ -172,10 +135,7 @@ def parse_transcript(path: Path) -> list[CallRecord]:
                 vendor=vendor,
                 in_tokens=bucket.in_tokens,
                 out_tokens=bucket.out_tokens,
-                cost_usd=(
-                    bucket.in_tokens / 1000 * price.input_rate
-                    + bucket.out_tokens / 1000 * price.output_rate
-                ),
+                cost_usd=cost_usd(model, bucket.in_tokens, bucket.out_tokens, prices),
                 calls=bucket.calls,
             )
         )

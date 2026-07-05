@@ -12,3 +12,9 @@ skus:
   claude-sonnet-4-6: { input: 0.003, output: 0.015, vendor: anthropic }
   claude-haiku-4-5: { input: 0.001, output: 0.005, vendor: anthropic }
   claude-haiku-4-5-20251001: { input: 0.001, output: 0.005, vendor: anthropic }
+  llama3.2:latest: { input: 0.0, output: 0.0, vendor: ollama }
+  llama3.1:8b: { input: 0.0, output: 0.0, vendor: ollama }
+  qwen2.5-coder:14b: { input: 0.0, output: 0.0, vendor: ollama }
+  gpt-oss:20b: { input: 0.0, output: 0.0, vendor: ollama }
+  gemma4:latest: { input: 0.0, output: 0.0, vendor: ollama }
+  nomic-embed-text:latest: { input: 0.0, output: 0.0, vendor: ollama }

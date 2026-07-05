@@ -45,9 +45,36 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
   *Kill:* if <80% of transcript calls can be attributed to a project within
   3 evenings, rescope attribution before continuing.
 - **M1 — live capture.** LiteLLM proxy source + pricing tables + caller-tag
-  attribution. *Acceptance:* 5 consecutive days of live traffic captured
-  alongside batch ingest. *Kill (proxy source only):* day 5 with <~100 live
-  calls → drop the proxy plugin, continue batch-only.
+  attribution. *Original acceptance (superseded 2026-07-05, owner decision
+  — time-boxed Fable window, no natural traffic source exists yet):* 5
+  consecutive days of live traffic. No process in this workspace currently
+  routes calls through any proxy — Claude Code/Codex IDE-seat traffic (the
+  bulk of measured spend) goes direct to vendor APIs — so a passive 5-day
+  clock would never start on its own. *Revised acceptance:* the mechanism
+  is built, unit-verified against the real litellm callback contract (see
+  probe below), and proven end-to-end with one real completion through a
+  local Ollama model. The 5-day/100-call soak becomes a background,
+  non-blocking observation once something real is later pointed at it —
+  not a gate on M2.
+
+  **Verified litellm callback contract (2026-07-05, real probe, not
+  guessed):** ran `litellm.completion(model="ollama/gemma4:latest", ...,
+  metadata={"caller_tag": "agent-ledger-probe"})` with a `CustomLogger`
+  registered and inspected `log_success_event`'s actual arguments:
+  - `kwargs["model"]` = `"gemma4:latest"` (provider prefix stripped by
+    litellm; matches the plain-name convention already used in
+    `pricing.yaml` and the workspace's `MODEL-PRICING.md`).
+  - `kwargs["custom_llm_provider"]` = `"ollama"`.
+  - `kwargs["litellm_params"]["metadata"]["caller_tag"]` = the value passed
+    into `metadata=` on the call — this is the project-attribution field.
+  - `kwargs["litellm_call_id"]` = a UUID, unique per call — used as
+    `CallRecord.session_id` (one live call = one row, unlike M0's
+    per-session aggregation).
+  - `kwargs["response_cost"]` = `0.0` for Ollama — litellm's own maintained
+    pricing DB; use it when present, fall back to `ledger/pricing.py`
+    otherwise.
+  - `response_obj.usage` has `.prompt_tokens` / `.completion_tokens`
+    (litellm normalizes this across every provider).
 - **M2 — counterfactual replay.** Policy engine + `replay`: re-route the last
   N calls per the workspace's §8 routing policy, measure savings with stated
   assumptions. *Acceptance:* replay over ≥500 real calls yields a savings

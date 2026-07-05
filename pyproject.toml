@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.9,<3",
     "structlog>=25.4,<26",
     "pyyaml>=6,<7",
+    "litellm>=1.60,<2",
 ]
 
 [project.scripts]
@@ -53,6 +54,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TCH"]
 "src/agent_ledger/ledger/repository.py" = ["TC001", "TC003"]
 "src/agent_ledger/ingest/claude_transcripts.py" = ["TC001", "TC003"]
 "src/agent_ledger/report/spend.py" = ["TC002", "TC003"]
+"src/agent_ledger/ingest/litellm_proxy.py" = ["ANN401", "TC001", "TC003"]
+"tests/test_m1_litellm_capture.py" = ["TC003"]
 
 [tool.mypy]
 strict = true

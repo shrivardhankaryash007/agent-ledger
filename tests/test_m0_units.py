@@ -11,8 +11,8 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from agent_ledger.ingest import claude_transcripts
 from agent_ledger.ingest.claude_transcripts import classify, parse_transcript
+from agent_ledger.ledger import pricing as pricing_module
 from agent_ledger.ledger.models import CallRecord
 from agent_ledger.ledger.repository import all_records, migrate, upsert
 from agent_ledger.report.spend import per_project
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 def _priced_model(family: str) -> str:
     """Resolve a fixture model without duplicating versioned SKU literals."""
 
-    return next(model for model in claude_transcripts._pricing() if family in model)
+    return next(model for model in pricing_module.load_pricing() if family in model)
 
 
 @pytest.mark.parametrize(
@@ -121,7 +121,7 @@ def test_parse_transcript_rejects_invalid_pricing(
     pricing_path.write_text(contents, encoding="utf-8")
     transcript_path = tmp_path / "session.jsonl"
     transcript_path.write_text("", encoding="utf-8")
-    monkeypatch.setattr(claude_transcripts, "PRICING_PATH", pricing_path)
+    monkeypatch.setattr(pricing_module, "PRICING_PATH", pricing_path)
 
     with pytest.raises(ValueError, match="pricing"):
         parse_transcript(transcript_path)
