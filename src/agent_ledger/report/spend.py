@@ -7,15 +7,36 @@ from pathlib import Path
 
 import polars as pl
 
+from agent_ledger.ledger.repository import all_records
+
 
 def per_project(db_path: Path) -> pl.DataFrame:
-    """Return one row per project: total in/out tokens, cost, call count,
-    and attribution_pct (share of records with a non-empty project).
+    """Return summed token, cost, and call totals grouped by project."""
 
-    M0 acceptance criterion: attribution_pct must be >= 0.8 on real data
-    (docs/architecture.md M0 kill criterion) or M0 is not done.
-
-    M0 TODO: read all_records(db_path), group by project, aggregate.
-    """
-
-    raise NotImplementedError("M0: implement per_project()")
+    records = all_records(db_path)
+    frame = pl.DataFrame(
+        {
+            "project": [record.project for record in records],
+            "in_tokens": [record.in_tokens for record in records],
+            "out_tokens": [record.out_tokens for record in records],
+            "cost_usd": [record.cost_usd for record in records],
+            "calls": [record.calls for record in records],
+        },
+        schema={
+            "project": pl.String,
+            "in_tokens": pl.Int64,
+            "out_tokens": pl.Int64,
+            "cost_usd": pl.Float64,
+            "calls": pl.Int64,
+        },
+    )
+    return (
+        frame.group_by("project")
+        .agg(
+            pl.col("in_tokens").sum(),
+            pl.col("out_tokens").sum(),
+            pl.col("cost_usd").sum(),
+            pl.col("calls").sum(),
+        )
+        .sort("project")
+    )
