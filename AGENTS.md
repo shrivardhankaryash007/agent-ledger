@@ -25,8 +25,14 @@ module boundaries and milestones.
 5. **Write the failing acceptance test before the implementation.** Every
    milestone's acceptance criterion in `docs/architecture.md` must exist as
    a test that fails for the stated reason before code is written to pass it.
-6. **ADR 0028 (workspace):** commit your own work at session end with a
-   conventional message; write the session log; update STATUS.md. Never push
+6. **ADR 0028 (workspace) — no exceptions, no reminders needed.** At the end
+   of every session that touches this repo, regardless of which agent or
+   vendor ran it: (a) commit your own work with a conventional message, (b)
+   write a session log at `~/dev/standards/agentic-os/sessions/YYYY-MM-DD-
+   HHMM-<provider>.md` following the schema in that directory's `README.md`
+   (`provider` ∈ `claude-code`/`codex`/`cursor`/`gemini-cli`/`local`/`other`),
+   (c) update `STATUS.md` if a milestone or acceptance state changed. This is
+   not optional and does not require the owner to ask each time. Never push
    without an explicit ask.
 7. **Port:** `8680`, registered in `~/dev/standards/PORTS.md`. Never default
    to 8000.
