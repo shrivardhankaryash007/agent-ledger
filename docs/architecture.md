@@ -75,6 +75,17 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
     otherwise.
   - `response_obj.usage` has `.prompt_tokens` / `.completion_tokens`
     (litellm normalizes this across every provider).
+
+  **Operational fact (2026-07-05, real end-to-end check, not just the
+  fixture tests):** litellm fires `log_success_event` on a background
+  thread, *after* `litellm.completion()` already returned to the caller.
+  Wiring `AgentLedgerLoggerCallback` and immediately calling
+  `report.spend.per_project()` in the same script can race the write and
+  see a stale/empty result — confirmed by reproducing the race, then
+  confirming a short delay resolves it. Any consumer that needs
+  freshly-written data right after a call (not just eventually-consistent
+  reporting) must account for this; `agent-ledger report` run as a
+  separate later command is unaffected.
 - **M2 — counterfactual replay.** Policy engine + `replay`: re-route the last
   N calls per the workspace's §8 routing policy, measure savings with stated
   assumptions. *Acceptance:* replay over ≥500 real calls yields a savings
