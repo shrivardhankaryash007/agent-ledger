@@ -27,11 +27,18 @@ Last updated: 2026-07-06
   same-session, and now that it has been, it fires. **This does not
   invalidate M2's $295 ceiling** (that number is total-spend/model-tier, not
   per-project), but the per-project spend view — half of M0's stated
-  acceptance criterion — is broken by construction today. Owner decision
-  needed: rescope attribution (e.g. derive project from git remote or session
-  `Touched:` paths instead of `path.parent.name`), accept per-project as
-  unsupported and keep only total/per-model views, or hold the whole track.
-  See Next Useful Work.
+  acceptance criterion — is broken by construction today.
+- **Rescope decided (2026-07-06, Claude Code): rescope, not hold/abandon.**
+  Real-transcript inspection (not guessed) found each JSONL line already
+  carries a per-line `cwd` field that tracks the actual working directory at
+  that message, and it changes mid-session (confirmed: a root-started
+  session whose `cwd` later shows `/Users/yashshrivardhankar/dev/careledger`).
+  `EXECUTION-PACKET-m0-cwd-attribution.md` (packet-lint clean, `--run`
+  confirmed red) specs bucketing by `(model, cwd-derived-project)` instead of
+  `model` alone, replacing `path.parent.name` with `Path(cwd).name` per line
+  when `cwd` is present. Ready for Codex to execute. Re-running the real
+  ingest and re-checking the 80% threshold is the owner's step after that
+  lands, not part of the packet.
 - Repository writes are idempotent on `(session_id, model_sku)` and reject an
   unsupported schema version.
 
@@ -67,16 +74,15 @@ drift.
 
 ## Next Useful Work
 
-- **Owner decision on the M0 attribution kill-criterion** (rescope /
-  accept-as-unsupported / hold) — this blocks any further per-project
-  reporting work; it does not block M2.5 (which is about traffic routing,
-  not attribution).
-- If rescoping: change `ingest/claude_transcripts.py`'s project-attribution
-  logic (currently `path.parent.name`) to something that survives root-
-  invoked sessions — e.g. parse each session log's `Touched:`/`project:`
-  frontmatter, or match against `git rev-parse` of files actually edited —
-  and re-run the M0 acceptance test against the real corpus, not just
-  fixtures, before calling it fixed.
-- If proceeding regardless: start M2.5 (route Penny's LLM calls through the
-  litellm capture point; 5-day soak; kill if <10 governable calls/day
-  sustained) — independent of the attribution gap.
+- **Hand `EXECUTION-PACKET-m0-cwd-attribution.md` to Codex.** One file to
+  edit (`src/agent_ledger/ingest/claude_transcripts.py`), one red test
+  already written and confirmed failing for the right reason
+  (`tests/test_m0_cwd_attribution.py`). Frontier/owner reviews the diff
+  before committing per the packet's §7.
+- After that lands: re-run the real ingest (`uv run agent-ledger ingest
+  ~/.claude/projects && uv run agent-ledger report`) and re-check the 80%
+  attribution threshold against real data, not fixtures.
+- M2.5 (route Penny's LLM calls through the litellm capture point; 5-day
+  soak; kill if <10 governable calls/day sustained) can proceed in parallel
+  — it is about traffic routing, not attribution, and does not depend on
+  the packet above.

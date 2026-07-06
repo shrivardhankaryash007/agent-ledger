@@ -1,0 +1,3 @@
+{"sessionId":"sess-mixed1","timestamp":"2026-07-06T09:00:00Z","cwd":"/Users/yashshrivardhankar/dev","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":1000,"output_tokens":200,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"sessionId":"sess-mixed1","timestamp":"2026-07-06T09:05:00Z","cwd":"/Users/yashshrivardhankar/dev/careledger","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":2000,"output_tokens":400,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"sessionId":"sess-mixed1","timestamp":"2026-07-06T09:10:00Z","cwd":"/Users/yashshrivardhankar/dev/careledger","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":500,"output_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
