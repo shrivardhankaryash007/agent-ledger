@@ -14,6 +14,7 @@ reference; this module must not import or modify them.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,15 +77,14 @@ def classify(model: str) -> tuple[str, str]:
     return "frontier_deep", "other"
 
 
-def parse_transcript(path: Path) -> list[CallRecord]:
-    """Aggregate one transcript into per-model records with project context."""
+def iter_transcript_lines(path: Path) -> Iterator[dict[object, object]]:
+    """Yield parsed JSON dictionary for each non-empty line in the transcript."""
 
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return []
+        return
 
-    buckets: dict[tuple[str, str], Bucket] = {}
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
@@ -95,7 +95,14 @@ def parse_transcript(path: Path) -> list[CallRecord]:
             continue
         if not isinstance(decoded, dict):
             continue
-        record = cast("dict[object, object]", decoded)
+        yield cast("dict[object, object]", decoded)
+
+
+def parse_transcript(path: Path) -> list[CallRecord]:
+    """Aggregate one transcript into per-model records with project context."""
+
+    buckets: dict[tuple[str, str], Bucket] = {}
+    for record in iter_transcript_lines(path):
         message_value = record.get("message")
         if not isinstance(message_value, dict):
             continue

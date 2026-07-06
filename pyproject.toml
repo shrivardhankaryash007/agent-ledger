@@ -48,7 +48,7 @@ target-version = "py311"
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TCH"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN"]
+"tests/**" = ["ANN", "TC003"]
 "src/agent_ledger/cli.py" = ["B008"]
 "src/agent_ledger/ledger/models.py" = ["TC003"]
 "src/agent_ledger/ledger/repository.py" = ["TC001", "TC003"]
