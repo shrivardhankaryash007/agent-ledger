@@ -28,17 +28,12 @@ Last updated: 2026-07-06
   invalidate M2's $295 ceiling** (that number is total-spend/model-tier, not
   per-project), but the per-project spend view — half of M0's stated
   acceptance criterion — is broken by construction today.
-- **Rescope decided (2026-07-06, Claude Code): rescope, not hold/abandon.**
-  Real-transcript inspection (not guessed) found each JSONL line already
-  carries a per-line `cwd` field that tracks the actual working directory at
-  that message, and it changes mid-session (confirmed: a root-started
-  session whose `cwd` later shows `/Users/yashshrivardhankar/dev/careledger`).
-  `EXECUTION-PACKET-m0-cwd-attribution.md` (packet-lint clean, `--run`
-  confirmed red) specs bucketing by `(model, cwd-derived-project)` instead of
-  `model` alone, replacing `path.parent.name` with `Path(cwd).name` per line
-  when `cwd` is present. Ready for Codex to execute. Re-running the real
-  ingest and re-checking the 80% threshold is the owner's step after that
-  lands, not part of the packet.
+- **Rescope landed (2026-07-06, Gemini High):** Implemented per-line `cwd` tracking
+  and bucketing by `(model, project)` inside `src/agent_ledger/ingest/claude_transcripts.py`.
+  If `cwd` is present in the JSONL line, the project is derived as `Path(cwd).name` and
+  session_id is suffixed with `:{project_name}` to prevent SQLite primary key conflicts.
+  Otherwise, it falls back to the directory name `path.parent.name` and the base session_id.
+  All checks and tests pass with 80.49% coverage.
 - Repository writes are idempotent on `(session_id, model_sku)` and reject an
   unsupported schema version.
 
@@ -64,9 +59,9 @@ drift.
 
 ## Known Gaps
 
-- **Per-project attribution is broken for the dominant call source** (see
-  Current Baseline) — this is the live, unresolved gap, not a deferred
-  milestone.
+- **Recheck of per-project attribution needed on real corpus:** The code has been updated
+  to read `cwd` per line, but the real ingest must be re-run to confirm if attribution
+  is now >= 80%.
 - M2.5 (governable-traffic soak) and M3 (budget wallet) remain deferred per
   `docs/architecture.md` and the FS-2 decision.
 - Not yet registered in `AGENTS.md`'s Active Projects table with its current
@@ -74,14 +69,8 @@ drift.
 
 ## Next Useful Work
 
-- **Hand `EXECUTION-PACKET-m0-cwd-attribution.md` to Codex.** One file to
-  edit (`src/agent_ledger/ingest/claude_transcripts.py`), one red test
-  already written and confirmed failing for the right reason
-  (`tests/test_m0_cwd_attribution.py`). Frontier/owner reviews the diff
-  before committing per the packet's §7.
-- After that lands: re-run the real ingest (`uv run agent-ledger ingest
-  ~/.claude/projects && uv run agent-ledger report`) and re-check the 80%
-  attribution threshold against real data, not fixtures.
+- **Re-run the real ingest and report:** Run `uv run agent-ledger ingest ~/.claude/projects && uv run agent-ledger report`
+  to verify if attribution is now >= 80% across the real transcript corpus.
 - M2.5 (route Penny's LLM calls through the litellm capture point; 5-day
   soak; kill if <10 governable calls/day sustained) can proceed in parallel
   — it is about traffic routing, not attribution, and does not depend on

@@ -31,6 +31,7 @@ class Bucket:
     """Aggregated usage for one model within a transcript."""
 
     session_id: str
+    project: str
     in_tokens: int = 0
     out_tokens: int = 0
     calls: int = 0
@@ -83,7 +84,7 @@ def parse_transcript(path: Path) -> list[CallRecord]:
     except (OSError, UnicodeDecodeError):
         return []
 
-    buckets: dict[str, Bucket] = {}
+    buckets: dict[tuple[str, str], Bucket] = {}
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
@@ -110,7 +111,19 @@ def parse_transcript(path: Path) -> list[CallRecord]:
             continue
         usage = cast("dict[object, object]", usage_value)
         session_id = str(record.get("sessionId") or path.stem)
-        bucket = buckets.setdefault(model, Bucket(session_id=session_id))
+
+        cwd = record.get("cwd")
+        if isinstance(cwd, str) and cwd:
+            project_for_line = Path(cwd).name
+            bucket_session_id = f"{session_id}:{project_for_line}"
+        else:
+            project_for_line = path.parent.name
+            bucket_session_id = session_id
+
+        bucket = buckets.setdefault(
+            (model, project_for_line),
+            Bucket(session_id=bucket_session_id, project=project_for_line),
+        )
         bucket.in_tokens += _token_count(usage.get("input_tokens"))
         bucket.in_tokens += _token_count(usage.get("cache_creation_input_tokens"))
         bucket.out_tokens += _token_count(usage.get("output_tokens"))
@@ -121,7 +134,7 @@ def parse_transcript(path: Path) -> list[CallRecord]:
 
     prices = load_pricing()
     records: list[CallRecord] = []
-    for model, bucket in buckets.items():
+    for (model, _project), bucket in buckets.items():
         if model not in prices:
             raise ValueError(f"no pricing configured for transcript model {model!r}")
         capability_class, vendor = classify(model)
@@ -129,7 +142,7 @@ def parse_transcript(path: Path) -> list[CallRecord]:
             CallRecord(
                 ts=_timestamp(bucket.last_ts, path),
                 session_id=bucket.session_id,
-                project=path.parent.name,
+                project=bucket.project,
                 model_sku=model,
                 capability_class=capability_class,
                 vendor=vendor,
