@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-06
+Last updated: 2026-07-06 (evening — Fable scope decision landed)
 
 ## Current Baseline
 
@@ -77,11 +77,19 @@ drift.
 
 ## Next Useful Work
 
-- **Rescope attribution again:** inspect the `-Users-yashshrivardhankar-dev`
-  bucket and decide whether project inference can be recovered from transcript
-  metadata, file activity, or a deliberate "workspace-root/unknown" product
-  category before continuing to rely on per-project spend.
+- **Scope decision landed (2026-07-06, Fable):** the next milestone is
+  **M3 — Resume Packet (continuity surface)**, before any further
+  routing/cost work. Decision memo: `docs/decisions/0002-continuity-before-
+  routing.md`. Milestone plan (Codex-executable, packets to be cut by
+  Sonnet): `EXECUTION-PLAN-m3-resume-packet.md`. First packet to cut:
+  M3.a corpus recon + ending detector.
+- **Attribution rescope #2 is demoted** to a gated precondition of the
+  routing/cost surfaces only (M4 budget wallet, replay-derived
+  recommendation claims). The resume packet is per-session and does not
+  depend on the 80% per-project line. Original rescope note preserved:
+  inspect the `-Users-yashshrivardhankar-dev` bucket; recover project from
+  transcript metadata, file activity, or a deliberate "workspace-root"
+  category.
 - M2.5 (route Penny's LLM calls through the litellm capture point; 5-day
-  soak; kill if <10 governable calls/day sustained) can proceed in parallel
-  — it is about traffic routing, not attribution, and does not depend on
-  the packet above.
+  soak; kill if <10 governable calls/day sustained) stays parallel and
+  non-blocking — it is about traffic routing, not attribution.

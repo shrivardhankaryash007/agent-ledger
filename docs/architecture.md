@@ -92,10 +92,21 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
   number. *Kill:* if >50% of calls require guessing whether local would have
   sufficed, stay observability-only. **This milestone's result is the FS-2
   Fable session trigger — see vault roadmap.**
-- **M3 — budget wallet.** Per-agent token budgets; enforcement hook + Desk
-  endpoint. *Acceptance:* an agent run halts/asks when budget is exhausted,
-  visible in the Desk. *Kill:* constant owner override in week 1 → advisory
-  mode only.
+- **M3 — resume packet (continuity surface). Re-scoped 2026-07-06, ADR 0002.**
+  Reconstruct the missing session handoff after an ungraceful ending (usage
+  limit, crash) from the transcript + git state; output in the
+  HANDOFF-CONTRACT session-log schema. Plan of record:
+  `EXECUTION-PLAN-m3-resume-packet.md`. *Acceptance:* ≥3 real interruptions
+  in a 14-day dogfood window where the packet was generated and used to
+  resume. *Kill:* founder resumes without the packet in ≥⅔ of ≥3 real
+  interruptions → demote to session listing, re-open routing roadmap.
+- **M4 — budget wallet (former M3, content unchanged).** Per-agent token
+  budgets; enforcement hook + Desk endpoint. *Gated by:* M2.5 (FS-2
+  decision) AND attribution rescope #2 (per-project spend must cross the
+  80% line before budgets keyed on it are trustworthy — ADR 0002).
+  *Acceptance:* an agent run halts/asks when budget is exhausted, visible
+  in the Desk. *Kill:* constant owner override in week 1 → advisory mode
+  only.
 
 ## Gates per milestone close
 
