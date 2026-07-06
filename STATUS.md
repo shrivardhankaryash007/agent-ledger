@@ -34,6 +34,13 @@ Last updated: 2026-07-06
   session_id is suffixed with `:{project_name}` to prevent SQLite primary key conflicts.
   Otherwise, it falls back to the directory name `path.parent.name` and the base session_id.
   All checks and tests pass with 80.49% coverage.
+- **Post-rescope real ingest still fails the attribution kill line
+  (2026-07-06, Codex):** `uv run agent-ledger ingest ~/.claude/projects &&
+  uv run agent-ledger report` ingested 204 records into `data/ledger.db`, but
+  call-weighted attribution is only **57.8% specific** versus **42.2%**
+  still bucketed under `-Users-yashshrivardhankar-dev`. This is an improvement
+  over the original 11.6% specific result, but it remains below the explicit
+  80% M0 kill threshold.
 - Repository writes are idempotent on `(session_id, model_sku)` and reject an
   unsupported schema version.
 
@@ -59,9 +66,10 @@ drift.
 
 ## Known Gaps
 
-- **Recheck of per-project attribution needed on real corpus:** The code has been updated
-  to read `cwd` per line, but the real ingest must be re-run to confirm if attribution
-  is now >= 80%.
+- **Per-project attribution remains below threshold after rescope:** 57.8%
+  of call volume is now project-specific on the real corpus, but the M0 kill
+  threshold is >=80%. The remaining workspace-root bucket needs a second
+  attribution strategy before per-project spend should be treated as reliable.
 - M2.5 (governable-traffic soak) and M3 (budget wallet) remain deferred per
   `docs/architecture.md` and the FS-2 decision.
 - Not yet registered in `AGENTS.md`'s Active Projects table with its current
@@ -69,8 +77,10 @@ drift.
 
 ## Next Useful Work
 
-- **Re-run the real ingest and report:** Run `uv run agent-ledger ingest ~/.claude/projects && uv run agent-ledger report`
-  to verify if attribution is now >= 80% across the real transcript corpus.
+- **Rescope attribution again:** inspect the `-Users-yashshrivardhankar-dev`
+  bucket and decide whether project inference can be recovered from transcript
+  metadata, file activity, or a deliberate "workspace-root/unknown" product
+  category before continuing to rely on per-project spend.
 - M2.5 (route Penny's LLM calls through the litellm capture point; 5-day
   soak; kill if <10 governable calls/day sustained) can proceed in parallel
   — it is about traffic routing, not attribution, and does not depend on
