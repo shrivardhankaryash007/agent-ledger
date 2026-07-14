@@ -39,6 +39,13 @@ class Bucket:
     last_ts: str = ""
 
 
+@dataclass
+class TranscriptLineStats:
+    """Counters describing lines skipped while iterating a transcript."""
+
+    skipped_lines: int = 0
+
+
 def _timestamp(raw: str, path: Path) -> datetime:
     """Parse a transcript timestamp, falling back to the file modification time."""
 
@@ -77,8 +84,18 @@ def classify(model: str) -> tuple[str, str]:
     return "frontier_deep", "other"
 
 
-def iter_transcript_lines(path: Path) -> Iterator[dict[object, object]]:
-    """Yield parsed JSON dictionary for each non-empty line in the transcript."""
+def iter_transcript_lines(
+    path: Path, stats: TranscriptLineStats | None = None
+) -> Iterator[dict[object, object]]:
+    """Yield parsed JSON dictionaries, counting malformed lines when requested.
+
+    Args:
+        path: Local transcript JSONL path.
+        stats: Optional mutable counters for skipped malformed lines.
+
+    Yields:
+        Parsed JSON objects that are dictionaries.
+    """
 
     try:
         text = path.read_text(encoding="utf-8")
@@ -92,8 +109,12 @@ def iter_transcript_lines(path: Path) -> Iterator[dict[object, object]]:
         try:
             decoded: object = json.loads(line)
         except json.JSONDecodeError:
+            if stats is not None:
+                stats.skipped_lines += 1
             continue
         if not isinstance(decoded, dict):
+            if stats is not None:
+                stats.skipped_lines += 1
             continue
         yield cast("dict[object, object]", decoded)
 

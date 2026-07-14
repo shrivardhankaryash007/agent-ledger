@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-06 (evening — Fable scope decision landed)
+Last updated: 2026-07-14 (M3.b built and verified)
 
 ## Current Baseline
 
@@ -16,7 +16,7 @@ Last updated: 2026-07-06 (evening — Fable scope decision landed)
 
 ## Verification
 
-The complete project gate passes (Ruff format, Ruff check, MyPy typecheck, PyTest with 86.31% coverage):
+The complete project gate passes (Ruff format, Ruff check, MyPy typecheck, PyTest with 87.15% coverage):
 
 ```bash
 .venv/bin/ruff format --check src/ tests/
@@ -25,7 +25,10 @@ The complete project gate passes (Ruff format, Ruff check, MyPy typecheck, PyTes
 .venv/bin/pytest
 ```
 
-Result (2026-07-06, M3.a checkpoint): 41 tests passing, coverage above the 80% floor.
+Result (2026-07-14, M3.b checkpoint): 45 tests passing, 87.15% total coverage;
+the extractor is 88% covered. A real most-recent local session was rendered
+to an ephemeral packet with every mandatory handoff section non-empty; the
+private packet was removed immediately and was not committed.
 
 ## Dirty / In-Flight State
 
@@ -40,8 +43,13 @@ Result (2026-07-06, M3.a checkpoint): 41 tests passing, coverage above the 80% f
 
 ## Next Useful Work
 
-- **M3.b — Packet generator + render (2–3 evenings):** Implement deterministic extraction (first user message -> intent; Edit/Write/NotebookEdit -> touched files; Bash -> command list; final assistant text -> last_state; heuristic next-actions) and rendering to the `HANDOFF-CONTRACT.md` session-log schema.
-- **M3.c — Dogfood + optional local enrichment (14-day passive window):** Optional `--llm` flag using local ollama.
+- **M3.b — Packet generator + render is built and verified (2026-07-14):**
+  deterministic extraction and `HANDOFF-CONTRACT.md` rendering are available
+  through `agent-ledger resume [--session ID] [--project NAME] [--out PATH]`;
+  malformed JSONL is skipped and counted, and no cloud calls are made.
+- **M3.c — Dogfood + optional local enrichment (14-day passive window):**
+  owner-paced and explicitly not started by the M3.b build; optional `--llm`
+  remains a separate local-ollama-only scope.
 - **Attribution rescope #2 is demoted** to a gated precondition of the
   routing/cost surfaces only.
 - M2.5 (route Penny's LLM calls through the litellm capture point) stays parallel and non-blocking.

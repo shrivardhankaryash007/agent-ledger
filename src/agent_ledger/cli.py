@@ -14,7 +14,9 @@ from agent_ledger.ledger.repository import all_records
 from agent_ledger.policy.replay import replay as run_replay
 from agent_ledger.report.spend import per_project
 from agent_ledger.resume.detector import detect_ending
+from agent_ledger.resume.extractor import extract_packet
 from agent_ledger.resume.models import SessionEnding
+from agent_ledger.resume.render import render_packet
 
 app = typer.Typer(help="Local-first LLM cost and routing ledger.")
 
@@ -86,11 +88,17 @@ def resume(
         )
         raise typer.Exit(1)
 
-    transcripts = []
+    transcripts: list[Path] = []
     for p in projects_dir.rglob("*.jsonl"):
         if "subagents" in p.parts:
             continue
         transcripts.append(p)
+    if project:
+        transcripts = [
+            path
+            for path in transcripts
+            if extract_packet(path).packet.project == project
+        ]
 
     if list_sessions:
         rows = []
@@ -195,7 +203,13 @@ def resume(
             f"(Last activity: {rows_non_completed[0][1]})"
         )
 
-    typer.echo("Resume-packet generation is not implemented yet (M3.b).")
+    result = extract_packet(target_path, ending=detect_ending(target_path))
+    rendered = render_packet(result.packet)
+    if out is not None:
+        out.write_text(rendered, encoding="utf-8")
+        typer.echo(f"Wrote reconstructed resume packet to {out}")
+    else:
+        typer.echo(rendered, nl=False)
 
 
 if __name__ == "__main__":
