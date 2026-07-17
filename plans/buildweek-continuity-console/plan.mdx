@@ -1,0 +1,236 @@
+---
+title: "BuildWeek Verified Recovery Console"
+brief: "Turn Agent Ledger's post-interruption packet into a local proof layer that distinguishes observed work, uncertainty, and safe continuation."
+kind: "plan"
+localOnly: true
+---
+
+<Callout tone="decision">
+The BuildWeek deliverable is a **Verified Recovery Console**. Its load-bearing extension is deterministic reconciliation: transcript events, explicit tool results, and current Git state become a versioned `RecoveryBrief` that says what is observed, what is inferred, what remains unknown, and what the next agent may safely do. The console is the product experience for that proof; the evidence contract is the technical center.
+</Callout>
+
+## Product thesis
+
+**When a coding agent dies, Agent Ledger separates what the session recorded from what the repository proves now, then hands the next agent a safe local continuation brief.**
+
+Initial audience: developers using a local Claude Code transcript as the interrupted source and handing work to any next coding-agent session through files and a vendor-neutral prompt. The source claim remains Claude Code only until another local format has its own inspected adapter and fixtures.
+
+## Why this scope
+
+The official BuildWeek rules evaluate pre-existing projects only on work added after the July 13 start. Commit `61dd0c6` (2026-07-14) is the first eligible functional extension: it added deterministic packet extraction/rendering and tests. The new slice must be visibly and technically more than a wrapper around that packet.
+
+<Table columns={["Candidate extension", "Implementation", "Design", "Impact", "Novelty", "Demo", "Privacy risk", "Time risk", "Verdict"]} rows={[
+  ["Continuation prompt only", "5", "4", "6", "4", "6", "1", "2", "Too thin"],
+  ["Evidence-cited RecoveryBrief + console", "8", "9", "8", "7", "9", "3", "5", "Good base, insufficient reconciliation"],
+  ["Verified Recovery Console", "9", "9", "9", "9", "10", "3", "6", "Selected"],
+  ["Cross-vendor Claude/Codex/Gemini ingestion", "9", "7", "9", "9", "9", "7", "9", "Ambitious; defer"],
+  ["Recovery benchmark/evaluation harness", "9", "6", "7", "9", "8", "2", "7", "Useful follow-on"],
+  ["Allowlisted recovery sandbox in an ephemeral worktree", "10", "8", "9", "10", "10", "7", "10", "Ambitious; defer"],
+  ["Background interruption watcher and session lineage", "9", "8", "8", "7", "9", "6", "9", "Overbuilt for the week"]
+]} />
+
+Scores are 1–10. Higher is better for the first five columns; higher is worse for both risk columns. They are comparative planning estimates, not measured outcomes.
+
+## Kingfisher Move: flight recorder plus incident brief
+
+**TL;DR:** Borrow a flight recorder's immutable evidence and an incident brief's action discipline, while rejecting black-box hardware, automatic control, and response bureaucracy.
+
+| Layer | Answer |
+|---|---|
+| Source phenomenon | Flight recorders preserve event evidence; incident command separates situation facts from response actions. |
+| What it computes | Local artifacts + current repository state → traceable observations, contradictions, uncertainty, and ordered safe actions. |
+| Source baggage to reject | Specialized hardware, centralized operations, pagers, approval chains, and postmortem ceremony. |
+| Transferable principle | Recovery begins by reconciling evidence before action. |
+| Target implementation | Versioned RecoveryBrief, stable evidence locators, readiness checks, and a guarded continuation prompt. |
+| Existing wheels | Existing transcript parser and resume packet, Git CLI, Pydantic, Typer, FastAPI. |
+| Hybrid advantage | More portable than a vendor's native resume and more trustworthy than an unconstrained summary. |
+| Wrong-if | The brief cannot expose one meaningful difference between recorded claims and current repository truth. |
+| Next experiment | The sanitized crash fixture must turn an unverified test command into an explicit `unknown` verification state and a safe next action. |
+
+**Status:** candidate
+
+## Hard-to-reverse decisions
+
+<Callout tone="decision">
+`ResumePacket` v1 stays backward-compatible and transcript-centric. A separate `RecoveryBrief` v1 is the public reconciliation wire format because it combines multiple evidence sources and has different lifecycle semantics. Observations use categorical certainty (`observed`, `inferred`); unresolved claims are separate `Uncertainty` records rather than invented confidence percentages. Schema changes require a version bump and golden compatibility tests.
+</Callout>
+
+<Callout tone="decision">
+Transcript content is untrusted data, never executable instruction. Only application-authored templates may become `ContinuationAction.instruction`; transcript TODOs, assistant prose, commands, and paths remain quoted evidence. The trusted repository comes only from explicit `--repo PATH` input or the invocation directory. Touched paths are normalized repo-relative paths; escapes, symlinks outside the repo, absolute paths, pathspec options, and traversal are rejected before fixed read-only Git calls.
+</Callout>
+
+<Callout tone="decision">
+The `RecoveryBrief` envelope is provider-neutral, but v1 ships only one declared source adapter: `claude-code-jsonl@1`. Evidence IDs are deterministic hashes of source kind + adapter version + redacted locator; canonical JSON uses sorted keys and stable list ordering. Another provider requires a separate inspected adapter and fixtures, never a heuristic reuse of the Claude parser.
+</Callout>
+
+<Callout tone="decision">
+Do not add React, Node, authentication accounts, or a second product service. The first console is FastAPI plus shipped HTML/CSS/JavaScript assets. Every console run uses an ephemeral capability token, strict Host/Origin checks, no CORS, `Cache-Control: no-store`, CSP with `frame-ancestors 'none'`, and local assets only. Distinctiveness comes from the recovery interaction and evidence ledger, not frontend infrastructure.
+</Callout>
+
+## Recovery model
+
+<DataModel entities={[
+  {id: "recovery-brief", name: "RecoveryBrief", fields: [{name: "brief_version", type: "int"}, {name: "source_adapter", type: "SourceAdapter"}, {name: "source_session_id", type: "str"}, {name: "ending", type: "SessionEnding"}, {name: "generated_at", type: "datetime"}, {name: "observations", type: "list[Observation]"}, {name: "uncertainties", type: "list[Uncertainty]"}, {name: "readiness_checks", type: "list[ReadinessCheck]"}, {name: "continuation_actions", type: "list[ContinuationAction]"}, {name: "evidence", type: "list[EvidenceRef]"}]},
+  {id: "evidence-ref", name: "EvidenceRef", fields: [{name: "id", type: "str"}, {name: "source_kind", type: "transcript | tool_result | git"}, {name: "source_label", type: "str"}, {name: "redacted_locator", type: "str"}, {name: "observed_at", type: "datetime | None", nullable: true}, {name: "digest", type: "sha256"}]},
+  {id: "observation", name: "Observation", fields: [{name: "id", type: "str"}, {name: "statement", type: "str"}, {name: "certainty", type: "observed | inferred"}, {name: "evidence_ids", type: "list[str]"}]},
+  {id: "uncertainty", name: "Uncertainty", fields: [{name: "id", type: "str"}, {name: "question", type: "str"}, {name: "why_unknown", type: "str"}, {name: "evidence_ids", type: "list[str]"}]},
+  {id: "readiness-check", name: "ReadinessCheck", fields: [{name: "id", type: "str"}, {name: "status", type: "pass | warn | block | unknown"}, {name: "explanation", type: "str"}, {name: "evidence_ids", type: "list[str]"}]},
+  {id: "continuation-action", name: "ContinuationAction", fields: [{name: "id", type: "str"}, {name: "instruction", type: "str"}, {name: "rationale", type: "str"}, {name: "evidence_ids", type: "list[str]"}, {name: "requires_human", type: "bool"}]}
+]} relations={[
+  {from: "recovery-brief", to: "evidence-ref", kind: "1-n", label: "contains"},
+  {from: "recovery-brief", to: "observation", kind: "1-n", label: "states"},
+  {from: "recovery-brief", to: "uncertainty", kind: "1-n", label: "flags"},
+  {from: "recovery-brief", to: "readiness-check", kind: "1-n", label: "evaluates"},
+  {from: "recovery-brief", to: "continuation-action", kind: "1-n", label: "orders"}
+]} />
+
+Evidence locators may identify a transcript line, tool-use/tool-result pair, Git `HEAD`, branch, or worktree-status snapshot. A recorded attempt, a recorded tool result, and a current difference from `HEAD` are distinct observations; the system never claims that the interrupted session caused the current difference. Exported JSON must not include an absolute home path or raw private transcript excerpt by default. `generated_at` is supplied by an injectable clock so fixtures and golden output remain deterministic.
+
+## Product flow
+
+```text
+sanitized/local transcript ─┐
+explicit tool results ──────┼─> RecoveryBrief v1 ─> console ─> copy safe prompt
+current Git read-only state ┘       facts / gaps / readiness / next actions
+```
+
+The single screen answers four questions in order:
+
+1. **What stopped?** Ending, intent, last activity, and touched files.
+2. **What can I trust?** Observed facts with stable evidence locators.
+3. **What differs or remains unknown now?** Current `HEAD`, dirty state, touched-file state relative to `HEAD`, and commands without explicit successful results.
+4. **How do I resume safely?** Three evidence-linked actions and a vendor-neutral prompt that tells the next agent to verify before editing.
+
+The visual direction is a compact flight-recorder strip crossed with an editorial incident brief: graphite, warm paper, red/amber/green used only for readiness, tabular evidence locators, and one dominant “Copy continuation brief” action. No vendor logos, decorative dashboard charts, external fonts, or decorative motion. Evidence highlighting must work with keyboard and reduced motion.
+
+## Repository changes
+
+<FileTree entries={[
+  {path: "src/agent_ledger/recovery/models.py", change: "added", note: "Versioned RecoveryBrief, evidence, certainty, readiness, and action types."},
+  {path: "src/agent_ledger/recovery/assembler.py", change: "added", note: "Pure deterministic reconciliation over ResumePacket, tool-result evidence, and Git snapshot."},
+  {path: "src/agent_ledger/recovery/git_state.py", change: "added", note: "Trusted repo selection, path containment, and a fixed read-only Git allowlist for branch, HEAD, status, and touched-file state relative to HEAD."},
+  {path: "src/agent_ledger/recovery/prompt.py", change: "added", note: "Vendor-neutral continuation renderer that labels transcript material untrusted and requires filesystem verification."},
+  {path: "src/agent_ledger/resume/evidence.py", change: "added", note: "Claude transcript line locators and tool-use/tool-result pairing without changing ResumePacket v1."},
+  {path: "src/agent_ledger/api/app.py", change: "added", note: "Capability-token FastAPI shell over one startup-selected brief; strict loopback, Host/Origin, no-store, CSP, and no arbitrary filesystem query surface."},
+  {path: "src/agent_ledger/api/static/", change: "added", note: "Accessible console HTML/CSS/JS with local assets only."},
+  {path: "src/agent_ledger/demo/scenario.py", change: "added", note: "Creates the sanitized deterministic interrupted-session scenario and disposable Git repository."},
+  {path: "src/agent_ledger/demo/fixture/", change: "added", note: "Package-shipped synthetic transcript and repository seed; contains no private or credential-like data."},
+  {path: "src/agent_ledger/cli.py", change: "modified", note: "Add `recover` JSON/prompt/console modes and one-command `demo` without changing existing commands."},
+  {path: "tests/test_recovery.py", change: "added", note: "Evidence integrity, certainty separation, freshness, deterministic output, privacy, and no-execution tests."},
+  {path: "tests/test_api.py", change: "added", note: "Local bind, API contract, HTML escaping, security headers, and demo path tests."},
+  {path: "tests/test_demo_install.py", change: "added", note: "Built-wheel smoke test for the judge path."},
+  {path: "docs/decisions/0003-recovery-brief-and-safety-boundary.md", change: "added", note: "Wire format, threat boundary, and why reconciliation is separate from ResumePacket."},
+  {path: "docs/recovery-evidence.md", change: "added", note: "Locally inspected Claude tool-use/tool-result shapes and conservative success/error/missing-result rules; no private excerpts."},
+  {path: "docs/architecture.md", change: "modified", note: "Add the BuildWeek recovery/API boundary; supersede M3's CLI-only statement without changing the frozen ledger."},
+  {path: "docs/buildweek-extension.md", change: "added", note: "Pre-period baseline `5baaf67`, dated eligible commits, Codex session evidence, before/after capability table, and exact judge commands."},
+  {path: "README.md", change: "modified", note: "One-command demo, tested/supported platform statement, and the required Codex/GPT-5.6 collaboration and decision narrative."},
+  {path: "STATUS.md", change: "modified", note: "Live BuildWeek acceptance state and the single next action."}
+]} />
+
+`src/agent_ledger/ledger/` remains untouched.
+
+## Local interface contracts
+
+`agent-ledger recover --session ID --repo PATH --format json|prompt` emits one canonical artifact. `agent-ledger recover --session ID --repo PATH --open` starts the capability-token console for that same brief and cleans up on exit. `agent-ledger demo [--no-open] [--smoke] [--port 8680]` creates a disposable synthetic repository, invokes the same assembly/UI path, and in smoke mode starts, fetches, verifies, stops, and deletes its temporary directory.
+
+<Endpoint method="GET" path="/" summary="Render the console for the single brief selected at startup; capability token required." />
+<Endpoint method="GET" path="/api/recovery" summary="Return canonical RecoveryBrief v1 JSON for the selected brief; no path parameter, no CORS, no-store." />
+<Endpoint method="GET" path="/api/prompt" summary="Return the deterministic application-authored continuation prompt for the same brief." />
+
+Judge commands:
+
+```bash
+uv sync
+uv run pytest
+uv run agent-ledger demo
+```
+
+Headless/testing variant:
+
+```bash
+uv run agent-ledger demo --no-open --smoke
+```
+
+## Acceptance tests
+
+1. **Evidence integrity:** every displayed observation, check, and action references an existing EvidenceRef; orphan or dangling IDs fail validation.
+2. **Truth separation:** “attempt recorded,” “tool result recorded,” and “currently differs from HEAD” are separate claims. A Bash invocation without a conservatively parsed successful result is `unknown`, never “verified”; no current difference is causally attributed to the interrupted session.
+3. **Repository boundary:** recovery accepts only explicit `--repo` or invocation cwd. Absolute/transverse touched paths, symlink escapes, leading-dash pathspecs, and transcript-supplied repository paths are rejected and never reach Git argv.
+4. **Current readiness:** unavailable Git, detached HEAD, dirty worktree, deleted touched file, and touched-file state relative to `HEAD` each yield a deterministic named state. Commit-time freshness inference is deferred.
+5. **No execution or prompt injection:** destructive shell text, imperative TODOs, and prompt-injection prose cause zero transcript-derived subprocess calls and never become `ContinuationAction.instruction`; tests assert exact Git argv and fixed action templates.
+6. **Privacy/server boundary:** default JSON and prompt contain no absolute home path, credential-like fixture content, or raw transcript excerpt. The console requires an ephemeral token, loopback + strict Host/Origin, no CORS, no-store, CSP/anti-framing, local assets, and escaped text.
+7. **Determinism:** fixed transcript + fixed Git snapshot + injected clock produces byte-identical canonical JSON and prompt output.
+8. **Backward compatibility:** current `agent-ledger resume` golden output and all 45 baseline tests remain green; no ledger migration occurs.
+9. **Runnable product:** a wheel installed into a disposable environment can execute `agent-ledger demo --no-open --smoke` and fetch the token-protected `/`, `/api/recovery`, and `/api/prompt` successfully before clean shutdown.
+10. **Interface quality:** desktop 1440px and narrow 390px screenshots, full keyboard path, visible focus, contrast, reduced motion, and copy-action feedback are inspected after implementation. The screenshot audit begins only after a real console exists.
+11. **Project gates:** Ruff format/check, MyPy strict, PyTest with ≥80% total and touched-module coverage, property tests for malformed JSONL, `uv build`, and the built-wheel smoke test pass.
+
+## Three-minute demo narrative
+
+| Time | Beat | Visible proof |
+|---|---|---|
+| 0:00–0:15 | A coding agent stops after invoking tests; the transcript has no successful tool result. | Sanitized interrupted tail, no private data. |
+| 0:15–0:30 | Run `uv run agent-ledger demo`. | One command opens the token-protected local console on `127.0.0.1:8680`. |
+| 0:30–1:10 | Inspect the brief. | Intent and touched file are recorded; test status is `unknown`; Git shows current touched-file state relative to `HEAD` without claiming who caused it. |
+| 1:10–1:35 | Exact before/after moment. | **Before:** “pytest was invoked” is easy to misread as “tests passed.” **After:** the console says “verification unknown—no successful result recorded,” links the evidence, and orders verification before editing. |
+| 1:35–1:55 | Copy the continuation brief. | Only application-authored actions enter the prompt; transcript prose is quoted as untrusted evidence and nothing executes. |
+| 1:55–2:18 | Show implementation evidence. | Dated post–July 13 commits, current Codex session ID, deterministic tests, and no-cloud/no-command-execution proof. |
+| 2:18–2:28 | Close on thesis. | “Recorded session facts. Current repository truth. One safe handoff.” |
+
+The video must include audio, remain below three minutes, be public on YouTube, and use only the sanitized demo scenario.
+
+## Explicitly deferred
+
+<Table columns={["Deferred", "Why"]} rows={[
+  ["Native Codex and Gemini ingestion adapters", "Actual local formats exist and can be inspected, but stable adapters plus privacy review would consume the remaining window and dilute the demonstrated Claude-source path."],
+  ["Automatic execution or an ephemeral recovery sandbox", "Creates a much larger command-trust and repository-mutation boundary."],
+  ["General-purpose `serve` command, new RecoveryBrief Markdown renderer, and commit-time freshness inference", "The approved first cut uses `recover --open`, canonical JSON/prompt, and current HEAD/worktree evidence only."],
+  ["Background watcher, daemon, notifications, and session lineage graph", "Adds lifecycle and persistence work before the on-demand recovery loop is proven."],
+  ["Cloud analysis, hosted dashboard, accounts, auth, analytics, and transcript upload", "Violates the local-first wedge and adds no judging value to this scenario."],
+  ["Ledger schema, attribution rescope, routing, and budget wallet", "Frozen or gated by existing evidence; unrelated to the winning recovery story."],
+  ["Local-LLM summarization", "Makes the product look like generic AI summarization and weakens deterministic evidence claims."],
+  ["Broad market claims", "Founder evidence is usability evidence, not external market validation."]
+]} />
+
+## Failure modes and stop rules
+
+<Callout tone="risk">
+**Platform absorption:** Claude Code, Gemini CLI, Cursor, and other tools already resume their own sessions. If the demo looks like a prettier session history, the idea loses. Stop and cut visual polish until the proof layer visibly exposes a contradiction or unknown that native resume does not.
+</Callout>
+
+<Callout tone="risk">
+**Generic-AI sameness:** no summarization model is part of the winning slice. Every claim in the interface must originate in deterministic parsing, explicit tool results, or Git. If an item cannot cite evidence, it belongs under uncertainty or recommendation.
+</Callout>
+
+<Callout tone="risk">
+**Weak BuildWeek evidence:** do not present pre–July 13 M0–M3.a as judged work. The submission evidence starts from baseline `5baaf67`, identifies eligible functionality by commit, records the implementation Codex session ID, and shows the exact new files and tests.
+</Callout>
+
+<Callout tone="risk">
+**Overbuilding:** build order is source-shape recon → recovery model → path/server safety tests → canonical JSON/prompt → demo fixture → filmed console path → video. General `serve`, Markdown, commit-time heuristics, background behavior, and broad visual polish remain deferred. If the deterministic model and demo fixture are not green before console work begins, do not start the console.
+</Callout>
+
+<Callout tone="risk">
+**Privacy and injection:** the public repo and video use only synthetic data. Real transcript packets are never committed, uploaded, logged, or sent to a cloud model. Transcript-derived HTML is escaped; transcript imperatives never become actions; trusted repository selection and path containment happen before Git; and the capability-token server exposes no arbitrary local path.
+</Callout>
+
+## Skills and verification sequence
+
+- `kingfisher-move`: applied to translate flight-recorder and incident-brief mechanisms into requirements and falsifiers.
+- `frontend-system` → `frontend-design`: applies when the console implementation begins; it must commit to the flight-recorder/incident-brief direction without introducing a frontend framework.
+- `web-design-guidelines`: applies after a real interface exists for accessibility and interaction review.
+- The screenshot-based Product Design audit is intentionally deferred until the flow can actually be captured; no audit claim is made from a plan.
+
+<Checklist items={[
+  {id: "packet-1", label: "Write failing RecoveryBrief evidence-integrity and no-execution tests"},
+  {id: "packet-2", label: "Record ADR 0003 and implement deterministic reconciliation core"},
+  {id: "packet-3", label: "Prove canonical JSON and guarded prompt CLI outputs"},
+  {id: "packet-4", label: "Build and wheel-test the sanitized one-command demo"},
+  {id: "packet-5", label: "Build the local console and visually verify desktop, narrow, keyboard, and reduced-motion paths"},
+  {id: "packet-6", label: "Update BuildWeek evidence, README collaboration narrative, STATUS, and full quality gate"},
+  {id: "packet-7", label: "Record the public under-three-minute demo and review the Devpost preview before final submission"}
+]} />
+
+<QuestionForm questions={[
+  {id: "approve_scope", title: "Approve the Verified Recovery Console scope for implementation?", mode: "single", options: [{id: "approve", label: "Approve", detail: "Implement the scoped deterministic recovery core, demo, and console.", recommended: true}, {id: "changes", label: "Request changes", detail: "Keep implementation paused and revise this plan first."}]}
+]} submitLabel="Record decision" />

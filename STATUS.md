@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-17 (Build Week repository published; Devpost draft complete)
+Last updated: 2026-07-17 (Build Week repository published; Verified Recovery Console plan awaiting owner approval)
 
 ## Current Baseline
 
@@ -47,11 +47,19 @@ private packet was removed immediately and was not committed.
   threshold is >=80%.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
+- `plans/buildweek-continuity-console/plan.mdx` proposes a deterministic
+  Verified Recovery Console extension. It is validated but unapproved; no
+  implementation has started.
 
 ## Next Useful Work
 
-- Record a concise public YouTube demo of the M3.b resume-packet flow, then
-  review the Devpost preview and submit only after explicit owner confirmation.
+- Owner reviews and approves or revises
+  `plans/buildweek-continuity-console/plan.mdx`. Do not implement before that
+  gate. If approved, begin with local Claude tool-result shape recon and failing
+  RecoveryBrief evidence/safety tests.
+- After the approved extension passes its judge-path gate, record the public
+  under-three-minute YouTube demo, review the Devpost preview, and submit only
+  after explicit owner confirmation.
 - **M3.b — Packet generator + render is built and verified (2026-07-14):**
   deterministic extraction and `HANDOFF-CONTRACT.md` rendering are available
   through `agent-ledger resume [--session ID] [--project NAME] [--out PATH]`;
