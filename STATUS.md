@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-17 (Build Week repository push blocked)
+Last updated: 2026-07-17 (Build Week repository published; Devpost draft complete)
 
 ## Current Baseline
 
@@ -30,25 +30,28 @@ the extractor is 88% covered. A real most-recent local session was rendered
 to an ephemeral packet with every mandatory handoff section non-empty; the
 private packet was removed immediately and was not committed.
 
-## Dirty / In-Flight State
+## Build Week Publication
 
-- Build Week publication commit is ready locally: `README.md` adds factual
-  Codex/GPT-5.6 provenance and `plans/buildweek-publication/plan.mdx` records
-  the approved scope. The public remote
-  `https://github.com/shrivardhankaryash007/agent-ledger` exists, but the
-  push is blocked until GitHub authorization includes the `workflow` scope
-  needed for the existing CI workflow.
+- The public repository is live at
+  `https://github.com/shrivardhankaryash007/agent-ledger`. Commit `ec5c1e5`
+  adds factual Codex/GPT-5.6 provenance; the complete local quality gate was
+  rerun and passed before publication.
+- The Devpost draft is complete through the finalization screen: it includes
+  the public repository, an evidence-backed Codex Session ID, and local
+  installation/testing instructions. It remains intentionally unsubmitted.
 
 ## Known Gaps
 
 - **Per-project attribution remains below threshold after rescope:** 57.8%
   of call volume is now project-specific on the real corpus, but the M0 kill
   threshold is >=80%.
-- A Build Week-ready demo video is not yet available; final Devpost submission
-  remains intentionally deferred.
+- A Build Week-ready public YouTube demo (under three minutes) is not yet
+  available; final Devpost submission remains intentionally deferred.
 
 ## Next Useful Work
 
+- Record a concise public YouTube demo of the M3.b resume-packet flow, then
+  review the Devpost preview and submit only after explicit owner confirmation.
 - **M3.b — Packet generator + render is built and verified (2026-07-14):**
   deterministic extraction and `HANDOFF-CONTRACT.md` rendering are available
   through `agent-ledger resume [--session ID] [--project NAME] [--out PATH]`;
