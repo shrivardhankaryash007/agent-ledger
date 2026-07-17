@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -172,3 +173,96 @@ def test_cli_resume_missing_dir(tmp_path: Path) -> None:
         result = runner.invoke(app, ["resume"])
         assert result.exit_code == 1
         assert "Error: Claude projects directory not found" in result.output
+
+
+def test_cli_recover_emits_json_and_safe_prompt(tmp_path: Path) -> None:
+    """Recover emits either the versioned JSON contract or safe prompt."""
+
+    projects_dir = tmp_path / "projects" / "demo"
+    projects_dir.mkdir(parents=True)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.email", "demo@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repo), "config", "user.name", "Recovery Test"],
+        check=True,
+    )
+    (repo / "safe.py").write_text("SAFE = True\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "safe.py"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "seed"], check=True)
+    create_fixture(
+        projects_dir,
+        "recover-me.jsonl",
+        [
+            {
+                "type": "user",
+                "sessionId": "recover-me",
+                "timestamp": "2026-07-17T09:00:00Z",
+                "message": {"role": "user", "content": "Continue safely."},
+            },
+            {
+                "type": "assistant",
+                "sessionId": "recover-me",
+                "timestamp": "2026-07-17T09:01:00Z",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_test",
+                            "name": "Bash",
+                            "input": {"command": "private-command --secret value"},
+                        }
+                    ],
+                },
+            },
+        ],
+    )
+
+    with patch.dict(
+        os.environ,
+        {"AGENT_LEDGER_CLAUDE_PROJECTS_DIR": str(tmp_path / "projects")},
+    ):
+        json_result = runner.invoke(
+            app,
+            [
+                "recover",
+                "--session",
+                "recover-me",
+                "--repo",
+                str(repo),
+                "--format",
+                "json",
+            ],
+        )
+        prompt_result = runner.invoke(
+            app,
+            [
+                "recover",
+                "--session",
+                "recover-me",
+                "--repo",
+                str(repo),
+                "--format",
+                "prompt",
+            ],
+        )
+
+    assert json_result.exit_code == 0
+    assert json.loads(json_result.output)["brief_version"] == 1
+    assert prompt_result.exit_code == 0
+    assert "# Verified recovery brief" in prompt_result.output
+    assert "private-command" not in json_result.output + prompt_result.output
+
+
+def test_cli_demo_smoke_uses_disposable_server() -> None:
+    """The demo command exposes a non-interactive smoke path."""
+
+    result = runner.invoke(app, ["demo", "--no-open", "--smoke", "--port", "0"])
+
+    assert result.exit_code == 0
+    assert "Demo smoke passed" in result.output

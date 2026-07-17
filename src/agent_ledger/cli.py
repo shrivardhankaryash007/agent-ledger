@@ -2,25 +2,91 @@
 
 from __future__ import annotations
 
+import json
 import os
+import secrets
+import shutil
+import tempfile
+import webbrowser
+from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 import typer
+import uvicorn
 
+from agent_ledger.api.app import create_app
+from agent_ledger.demo.scenario import DemoError, build_demo_scenario, run_demo_smoke
 from agent_ledger.ingest.claude_transcripts import ingest as ingest_transcripts
 from agent_ledger.ledger.pricing import load_pricing
 from agent_ledger.ledger.repository import all_records
 from agent_ledger.policy.replay import replay as run_replay
+from agent_ledger.recovery.assembler import recover_session
+from agent_ledger.recovery.prompt import render_recovery_prompt
 from agent_ledger.report.spend import per_project
 from agent_ledger.resume.detector import detect_ending
 from agent_ledger.resume.extractor import extract_packet
 from agent_ledger.resume.models import SessionEnding
 from agent_ledger.resume.render import render_packet
 
+if TYPE_CHECKING:
+    from agent_ledger.recovery.models import RecoveryBrief
+
 app = typer.Typer(help="Local-first LLM cost and routing ledger.")
 
 DEFAULT_DB_PATH = Path("data/ledger.db")
+DEFAULT_CONSOLE_PORT = 8680
+
+
+class RecoveryFormat(StrEnum):
+    """Supported non-interactive recovery output formats."""
+
+    json = "json"
+    prompt = "prompt"
+
+
+def _projects_dir() -> Path:
+    configured = os.environ.get("AGENT_LEDGER_CLAUDE_PROJECTS_DIR")
+    return (
+        Path(configured)
+        if configured is not None
+        else Path("~/.claude/projects").expanduser()
+    )
+
+
+def _find_transcript(session: str) -> Path:
+    projects_dir = _projects_dir()
+    if not projects_dir.is_dir():
+        raise FileNotFoundError(
+            f"Claude projects directory not found at {projects_dir}"
+        )
+    for path in projects_dir.rglob("*.jsonl"):
+        if "subagents" not in path.parts and path.stem == session:
+            return path
+    raise FileNotFoundError(f"Session {session} not found")
+
+
+def _serve_console(
+    brief: RecoveryBrief,
+    prompt: str,
+    *,
+    port: int,
+    open_browser: bool,
+) -> None:
+    token = secrets.token_urlsafe(24)
+    console_app = create_app(
+        brief=brief,
+        prompt=prompt,
+        capability_token=token,
+        port=port,
+    )
+    url = f"http://127.0.0.1:{port}/?token={token}"
+    typer.echo(f"Recovery console: {url}")
+    typer.echo("Press Ctrl+C to stop the local read-only server.")
+    if open_browser:
+        webbrowser.open(url)
+    uvicorn.run(console_app, host="127.0.0.1", port=port, log_level="warning")
 
 
 @app.command()
@@ -75,11 +141,7 @@ def resume(
 ) -> None:
     """Reconstruct handoff packets or list sessions with ending classification."""
 
-    projects_dir_str = os.environ.get("AGENT_LEDGER_CLAUDE_PROJECTS_DIR")
-    if projects_dir_str:
-        projects_dir = Path(projects_dir_str)
-    else:
-        projects_dir = Path("~/.claude/projects").expanduser()
+    projects_dir = _projects_dir()
 
     if not projects_dir.is_dir():
         typer.echo(
@@ -210,6 +272,99 @@ def resume(
         typer.echo(f"Wrote reconstructed resume packet to {out}")
     else:
         typer.echo(rendered, nl=False)
+
+
+@app.command()
+def recover(
+    session: str = typer.Option(..., "--session", help="Session ID to recover."),
+    repo: Path = typer.Option(
+        Path.cwd(),
+        "--repo",
+        help="Trusted current Git repository.",
+    ),
+    output_format: RecoveryFormat = typer.Option(
+        RecoveryFormat.prompt,
+        "--format",
+        help="Non-interactive output format.",
+    ),
+    open_console: bool = typer.Option(
+        False,
+        "--open",
+        help="Open the capability-protected local recovery console.",
+    ),
+    port: int = typer.Option(
+        DEFAULT_CONSOLE_PORT,
+        "--port",
+        min=1,
+        max=65535,
+        help="Local console port.",
+    ),
+) -> None:
+    """Recover a session against current, owner-selected repository state."""
+
+    try:
+        transcript = _find_transcript(session)
+        brief = recover_session(transcript, repo)
+    except (FileNotFoundError, OSError, ValueError, RuntimeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    prompt = render_recovery_prompt(brief)
+    if open_console:
+        _serve_console(brief, prompt, port=port, open_browser=True)
+        return
+    if output_format is RecoveryFormat.json:
+        typer.echo(json.dumps(brief.model_dump(mode="json"), indent=2))
+    else:
+        typer.echo(prompt, nl=False)
+
+
+@app.command()
+def demo(
+    no_open: bool = typer.Option(
+        False,
+        "--no-open",
+        help="Do not open the browser automatically.",
+    ),
+    smoke: bool = typer.Option(
+        False,
+        "--smoke",
+        help="Start, fetch, stop, clean, and exit.",
+    ),
+    port: int = typer.Option(
+        DEFAULT_CONSOLE_PORT,
+        "--port",
+        min=0,
+        max=65535,
+        help="Local demo port; zero selects a free port in smoke mode.",
+    ),
+) -> None:
+    """Run the exact disposable Build Week recovery scenario."""
+
+    demo_root = Path(tempfile.mkdtemp(prefix="agent-ledger-demo-"))
+    try:
+        if smoke:
+            result = run_demo_smoke(base_dir=demo_root, port=port)
+            typer.echo(
+                "Demo smoke passed: "
+                f"root={result.root_status}, api={result.api_status}, "
+                f"prompt={result.prompt_status}, stopped={result.server_stopped}"
+            )
+            return
+        if port == 0:
+            raise DemoError("port zero is only supported with --smoke")
+        scenario = build_demo_scenario(demo_root)
+        _serve_console(
+            scenario.brief,
+            scenario.prompt,
+            port=port,
+            open_browser=not no_open,
+        )
+    except (DemoError, OSError, ValueError, RuntimeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    finally:
+        if demo_root.exists():
+            shutil.rmtree(demo_root)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="theme-color" content="#191b1c">
+    <meta name="agent-ledger-token" content="__CAPABILITY_TOKEN__">
+    <title>Agent Ledger — Recovery Console</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/app.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to recovery brief</a>
+    <div class="shell">
+      <header class="masthead">
+        <a class="wordmark" href="#main" aria-label="Agent Ledger recovery home">
+          <span class="wordmark-mark" aria-hidden="true">AL</span>
+          <span>AGENT LEDGER</span>
+        </a>
+        <div class="masthead-mode">
+          <span class="live-dot" aria-hidden="true"></span>
+          LOCAL / READ ONLY
+        </div>
+      </header>
+
+      <main id="main" tabindex="-1">
+        <section class="hero" aria-labelledby="brief-title">
+          <div class="eyebrow">INTERRUPTED SESSION / VERIFIED RECOVERY</div>
+          <div class="hero-grid">
+            <div>
+              <h1 id="brief-title">The transcript remembers.<br>The repository decides.</h1>
+              <p class="lede">A current-state brief for the next agent, with every claim tied to local evidence.</p>
+            </div>
+            <div id="overall-status" class="overall-status" aria-live="polite">
+              <span class="status-code">—</span>
+              <span class="status-label">ASSESSING READINESS</span>
+            </div>
+          </div>
+          <dl id="session-facts" class="session-facts" aria-label="Session facts"></dl>
+        </section>
+
+        <section class="comparison" aria-label="Recorded and current state">
+          <article class="panel recorded-panel">
+            <header class="panel-header">
+              <span class="panel-index">01</span>
+              <div>
+                <p class="kicker">THEN / TRANSCRIPT</p>
+                <h2>Recorded attempt</h2>
+              </div>
+            </header>
+            <div class="intent-block">
+              <span class="field-label">RECORDED INTENT</span>
+              <p id="intent">Loading local evidence…</p>
+            </div>
+            <ol id="recorded-observations" class="signal-list"></ol>
+          </article>
+
+          <article class="panel current-panel">
+            <header class="panel-header">
+              <span class="panel-index">02</span>
+              <div>
+                <p class="kicker">NOW / GIT</p>
+                <h2>Current proof</h2>
+              </div>
+            </header>
+            <ol id="current-observations" class="signal-list"></ol>
+            <div class="uncertainty-block">
+              <span class="field-label">DO NOT ASSUME</span>
+              <ul id="uncertainties"></ul>
+            </div>
+          </article>
+        </section>
+
+        <section class="readiness-section" aria-labelledby="readiness-title">
+          <header class="section-header">
+            <div>
+              <p class="kicker">03 / CONTINUATION GATES</p>
+              <h2 id="readiness-title">Readiness board</h2>
+            </div>
+            <p>Observed state, not agent narration.</p>
+          </header>
+          <div id="readiness-grid" class="readiness-grid"></div>
+        </section>
+
+        <section class="handoff-section" aria-labelledby="handoff-title">
+          <div class="handoff-copy">
+            <p class="kicker">04 / SAFE HANDOFF</p>
+            <h2 id="handoff-title">Continue in this order.</h2>
+            <p>These steps are authored by Agent Ledger. Recovered commands and TODO text are never promoted into actions.</p>
+          </div>
+          <ol id="actions" class="action-list"></ol>
+        </section>
+
+        <section class="evidence-section" aria-labelledby="evidence-title">
+          <header class="section-header">
+            <div>
+              <p class="kicker">05 / TRACE</p>
+              <h2 id="evidence-title">Evidence register</h2>
+            </div>
+            <span id="evidence-count" class="count-chip">— SOURCES</span>
+          </header>
+          <div id="evidence-grid" class="evidence-grid"></div>
+        </section>
+
+        <section class="prompt-section" aria-labelledby="prompt-title">
+          <div>
+            <p class="kicker">READY FOR THE NEXT SEAT</p>
+            <h2 id="prompt-title">Continuation brief</h2>
+            <p>A plain-text handoff with the same evidence boundaries shown above.</p>
+          </div>
+          <button id="copy-prompt" class="copy-button" type="button" disabled>
+            Copy Safe Prompt
+          </button>
+          <p id="copy-status" class="copy-status" aria-live="polite"></p>
+        </section>
+      </main>
+
+      <footer>
+        <span>AGENT LEDGER / RECOVERY BRIEF v1</span>
+        <span>LOCAL EVIDENCE ONLY</span>
+      </footer>
+    </div>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

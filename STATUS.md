@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-17 (Build Week repository published; Verified Recovery Console plan awaiting owner approval)
+Last updated: 2026-07-18 (Verified Recovery Console implemented and browser-verified; final publication assets pending)
 
 ## Current Baseline
 
@@ -13,10 +13,17 @@ Last updated: 2026-07-17 (Build Week repository published; Verified Recovery Con
 - **M3.a (Ending Detector) is built, tested, and committed** (2026-07-06):
   Exposes ending classification (`completed`, `interrupted_limit`, `interrupted_abort`, `unknown`) over Claude Code transcripts. Employs git commit timestamp correlation (`[-10 mins, +15 mins]` window around last activity) and transcript tail analysis (looking for mode normal, ai-title, last-prompt, rate-limit, and network errors).
   The CLI command `agent-ledger resume --list` is fully implemented and renders the table over the real corpus without error.
+- **M3.b Verified Recovery Console is implemented** (2026-07-17, ADR 0003):
+  `agent-ledger recover` emits provider-neutral `RecoveryBrief` v1 JSON or a
+  safe prompt, and `agent-ledger demo` runs the exact disposable before/after
+  judge path. Transcript commands/results remain untrusted, Git inspection is
+  fixed and read-only, unsafe paths fail closed, and the localhost console is
+  protected by capability token, Host/Origin allowlists, no CORS, no-store,
+  and restrictive CSP.
 
 ## Verification
 
-The complete project gate passes (Ruff format, Ruff check, MyPy typecheck, PyTest with 87.15% coverage):
+The complete project gate passes (Ruff format, Ruff check, MyPy strict, and PyTest):
 
 ```bash
 .venv/bin/ruff format --check src/ tests/
@@ -25,10 +32,13 @@ The complete project gate passes (Ruff format, Ruff check, MyPy typecheck, PyTes
 .venv/bin/pytest
 ```
 
-Result (2026-07-14, M3.b checkpoint): 45 tests passing, 87.15% total coverage;
-the extractor is 88% covered. A real most-recent local session was rendered
-to an ephemeral packet with every mandatory handoff section non-empty; the
-private packet was removed immediately and was not committed.
+Result (2026-07-18, handoff checkpoint): 62 tests passing, 85.69% total
+coverage. The real localhost smoke cycle starts, fetches all product endpoints,
+stops, and cleans its synthetic repository. Browser review passes at 1440px
+desktop and 390px mobile; the mobile document has no horizontal overflow,
+keyboard skip/copy works, and the console reports zero errors or warnings. A
+fresh wheel was installed into an isolated Python 3.11 environment; packaged
+HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
 
 ## Build Week Publication
 
@@ -47,19 +57,17 @@ private packet was removed immediately and was not committed.
   threshold is >=80%.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
-- `plans/buildweek-continuity-console/plan.mdx` proposes a deterministic
-  Verified Recovery Console extension. It is validated but unapproved; no
-  implementation has started.
+- Claude Code commonly records absolute file paths. `RecoveryBrief` v1 rejects
+  them by design; a future adapter revision needs an explicitly reviewed
+  normalization policy before real-session path comparison becomes convenient.
+- Only `claude-code-jsonl@1` is implemented. Codex and Gemini adapters remain
+  deferred until after the competition submission.
 
 ## Next Useful Work
 
-- Owner reviews and approves or revises
-  `plans/buildweek-continuity-console/plan.mdx`. Do not implement before that
-  gate. If approved, begin with local Claude tool-result shape recon and failing
-  RecoveryBrief evidence/safety tests.
-- After the approved extension passes its judge-path gate, record the public
-  under-three-minute YouTube demo, review the Devpost preview, and submit only
-  after explicit owner confirmation.
+- Record the public under-three-minute YouTube demo using
+  `agent-ledger demo`, then review the Devpost preview. Submit only after
+  explicit owner confirmation.
 - **M3.b — Packet generator + render is built and verified (2026-07-14):**
   deterministic extraction and `HANDOFF-CONTRACT.md` rendering are available
   through `agent-ledger resume [--session ID] [--project NAME] [--out PATH]`;

@@ -21,9 +21,18 @@ decision.
 - `policy/` — routing policy engine (M2). Pure functions, no I/O.
 - `report/` — polars aggregations: per-project/per-model spend, counterfactual
   replay. Output is plain dataclasses/frames (UI-agnostic).
-- `api/` + `cli/` — FastAPI read endpoints (Desk widget consumer) and typer
-  commands (`agent-ledger ingest`, `agent-ledger report`, later `replay`,
-  `budget`).
+- `resume/` — transcript ending detection, narrative `ResumePacket` v1, and
+  provider-specific structural evidence extraction. Evidence extraction strips
+  Bash commands and tool-result bodies before crossing into recovery.
+- `recovery/` — provider-neutral `RecoveryBrief` v1, fixed read-only Git
+  inspection, path-containment checks, evidence assembly, and safe prompt
+  rendering. It does not import or modify `ledger/`.
+- `api/` — capability-protected localhost recovery console. Packaged static
+  assets, no CORS, no external resources, and no mutation endpoints.
+- `demo/` — disposable synthetic before/after Git scenario using the same
+  recovery assembler and API as real sessions.
+- `cli/` — typer commands for ledger flows plus `recover` and the exact
+  reproducible `demo` judge path.
 
 ## Prior-art note (2026-07-05 audit)
 
@@ -100,6 +109,13 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
   in a 14-day dogfood window where the packet was generated and used to
   resume. *Kill:* founder resumes without the packet in ≥⅔ of ≥3 real
   interruptions → demote to session listing, re-open routing roadmap.
+  - **M3.b extension — Verified Recovery Console (2026-07-17, ADR 0003).**
+    Adds an evidence-linked `RecoveryBrief` without changing `ResumePacket`.
+    The transcript records attempts/results; current Git proves present state;
+    neither is promoted into causal attribution. Acceptance: the disposable
+    demo reports a missing verification result as unknown, rejects unsafe
+    paths, serves only through a secured localhost capability, and passes the
+    installed-wheel smoke path.
 - **M4 — budget wallet (former M3, content unchanged).** Per-agent token
   budgets; enforcement hook + Desk endpoint. *Gated by:* M2.5 (FS-2
   decision) AND attribution rescope #2 (per-project spend must cross the
