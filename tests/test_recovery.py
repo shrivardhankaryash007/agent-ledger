@@ -187,6 +187,7 @@ def test_recovery_separates_recorded_attempt_from_current_git_state(
         "../outside.py",
         "/tmp/outside.py",
         "-dangerous-pathspec",
+        "safe\\windows.py",
     ],
 )
 def test_recovery_rejects_untrusted_paths(tmp_path: Path, recorded_path: str) -> None:
@@ -209,6 +210,63 @@ def test_recovery_rejects_untrusted_paths(tmp_path: Path, recorded_path: str) ->
 
     with pytest.raises(UnsafeRecoveryPathError):
         recover_session(transcript, repo, generated_at=FIXED_NOW)
+
+
+def test_recovery_accepts_contained_absolute_path(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _init_repo(repo)
+    _commit_file(repo, "src/check.py", "STATE = 'before'\n")
+    (repo / "src/check.py").write_text("STATE = 'after'\n", encoding="utf-8")
+    transcript = tmp_path / "session-recovery.jsonl"
+    _write_transcript(
+        transcript,
+        [
+            {
+                "type": "tool_use",
+                "id": "toolu_edit",
+                "name": "Edit",
+                "input": {"file_path": str(repo / "src/check.py")},
+            }
+        ],
+    )
+
+    brief = recover_session(transcript, repo, generated_at=FIXED_NOW)
+
+    assert any(
+        "'src/check.py' differs from HEAD" in item.statement
+        for item in brief.observations
+    )
+
+
+def test_recovery_rejects_absolute_path_in_same_named_sibling_repo(
+    tmp_path: Path,
+) -> None:
+    trusted = tmp_path / "trusted" / "repo"
+    trusted.parent.mkdir()
+    trusted.mkdir()
+    _init_repo(trusted)
+    _commit_file(trusted, "safe.py", "SAFE = True\n")
+    sibling = tmp_path / "sibling" / "repo"
+    sibling.parent.mkdir()
+    sibling.mkdir()
+    _init_repo(sibling)
+    _commit_file(sibling, "safe.py", "SAFE = False\n")
+    transcript = tmp_path / "session-recovery.jsonl"
+    _write_transcript(
+        transcript,
+        [
+            {
+                "type": "tool_use",
+                "id": "toolu_edit",
+                "name": "Edit",
+                "input": {"file_path": str(sibling / "safe.py")},
+            }
+        ],
+    )
+
+    with pytest.raises(UnsafeRecoveryPathError):
+        recover_session(transcript, trusted, generated_at=FIXED_NOW)
 
 
 def test_recovery_rejects_symlink_escape(tmp_path: Path) -> None:

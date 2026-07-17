@@ -34,6 +34,15 @@ class ReadinessStatus(StrEnum):
     unknown = "unknown"
 
 
+class CandidateEnding(StrEnum):
+    """Coarse provider-neutral ending state for recovery discovery."""
+
+    completed = "completed"
+    interrupted = "interrupted"
+    active = "active"
+    unknown = "unknown"
+
+
 class RecoveryModel(BaseModel):
     """Strict base model for the public recovery contract."""
 
@@ -45,6 +54,20 @@ class SourceAdapter(RecoveryModel):
 
     name: str
     version: int = Field(ge=1)
+
+
+class SessionCandidate(RecoveryModel):
+    """Privacy-redacted session metadata safe for the Recovery Inbox."""
+
+    candidate_id: str
+    provider: str
+    source_adapter: SourceAdapter
+    source_session_id: str
+    project_hint: str
+    started_at: datetime
+    updated_at: datetime
+    ending: CandidateEnding
+    unmatched_call_count: int = Field(ge=0)
 
 
 class EvidenceRef(RecoveryModel):

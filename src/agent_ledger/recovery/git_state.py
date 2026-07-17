@@ -87,26 +87,31 @@ def validate_recovery_path(root: Path, recorded_path: str) -> str:
         recorded_path: Untrusted path from a tool invocation.
 
     Returns:
-        Normalized POSIX repository-relative path.
+        Normalized POSIX repository-relative path. A contained absolute input is
+        converted only after canonical containment is proven.
 
     Raises:
-        UnsafeRecoveryPathError: If the path is absolute, ambiguous, or escapes.
+        UnsafeRecoveryPathError: If the path is ambiguous or escapes.
     """
 
     if not recorded_path or "\\" in recorded_path:
         raise UnsafeRecoveryPathError("recorded path is empty or non-POSIX")
     pure = PurePosixPath(recorded_path)
-    if pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
-        raise UnsafeRecoveryPathError("recorded path must be repository-relative")
-    if pure.parts[0].startswith("-"):
-        raise UnsafeRecoveryPathError("recorded path may not resemble a Git option")
-    candidate = (root / Path(*pure.parts)).resolve(strict=False)
+    if any(part in {"", ".", ".."} for part in pure.parts):
+        raise UnsafeRecoveryPathError("recorded path is ambiguous or traverses")
+    candidate = (
+        Path(recorded_path).resolve(strict=False)
+        if pure.is_absolute()
+        else (root / Path(*pure.parts)).resolve(strict=False)
+    )
     try:
         relative = candidate.relative_to(root)
     except ValueError as exc:
         raise UnsafeRecoveryPathError(
             "recorded path escapes the trusted repository"
         ) from exc
+    if not relative.parts or relative.parts[0].startswith("-"):
+        raise UnsafeRecoveryPathError("recorded path may not resemble a Git option")
     return relative.as_posix()
 
 

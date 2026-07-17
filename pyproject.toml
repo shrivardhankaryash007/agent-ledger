@@ -58,6 +58,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "TCH"]
 "tests/test_m1_litellm_capture.py" = ["TC003"]
 "src/agent_ledger/policy/replay.py" = ["TC001"]
 "src/agent_ledger/recovery/models.py" = ["TC003"]
+"src/agent_ledger/recovery/adapters/base.py" = ["TC001", "TC003"]
 
 [tool.mypy]
 strict = true

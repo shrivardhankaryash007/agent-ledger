@@ -7,6 +7,11 @@ import json
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
+from agent_ledger.recovery.adapters.base import (
+    ResultStatus,
+    ToolAttempt,
+    TranscriptEvidence,
+)
 from agent_ledger.recovery.git_state import GitSnapshot, inspect_git
 from agent_ledger.recovery.models import (
     Certainty,
@@ -20,17 +25,10 @@ from agent_ledger.recovery.models import (
     SourceAdapter,
     Uncertainty,
 )
-from agent_ledger.resume.evidence import (
-    ResultStatus,
-    ToolAttempt,
-    TranscriptEvidence,
-    extract_transcript_evidence,
-)
+from agent_ledger.resume.evidence import extract_transcript_evidence
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-ADAPTER = SourceAdapter(name="claude-code-jsonl", version=1)
 
 
 def _digest(value: object) -> str:
@@ -38,15 +36,19 @@ def _digest(value: object) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _evidence_id(kind: EvidenceKind, locator: str) -> str:
-    return f"ev-{_digest([ADAPTER.name, ADAPTER.version, kind, locator])[:16]}"
+def _evidence_id(adapter: SourceAdapter, kind: EvidenceKind, locator: str) -> str:
+    return f"ev-{_digest([adapter.name, adapter.version, kind, locator])[:16]}"
 
 
 def _ref(
-    kind: EvidenceKind, label: str, locator: str, digest_value: object
+    adapter: SourceAdapter,
+    kind: EvidenceKind,
+    label: str,
+    locator: str,
+    digest_value: object,
 ) -> EvidenceRef:
     return EvidenceRef(
-        id=_evidence_id(kind, locator),
+        id=_evidence_id(adapter, kind, locator),
         kind=kind,
         label=label,
         locator=locator,
@@ -54,7 +56,7 @@ def _ref(
     )
 
 
-def _attempt_ref(attempt: ToolAttempt) -> EvidenceRef:
+def _attempt_ref(adapter: SourceAdapter, attempt: ToolAttempt) -> EvidenceRef:
     kind = (
         EvidenceKind.tool_result
         if attempt.result_status is not ResultStatus.missing
@@ -62,6 +64,7 @@ def _attempt_ref(attempt: ToolAttempt) -> EvidenceRef:
     )
     locator = f"line:{attempt.line_number}:tool:{attempt.tool_use_id}"
     return _ref(
+        adapter,
         kind,
         f"Recorded {attempt.name} attempt",
         locator,
@@ -80,6 +83,7 @@ def _assemble_evidence(
 ) -> tuple[EvidenceRef, ...]:
     refs: list[EvidenceRef] = [
         _ref(
+            transcript.source_adapter,
             EvidenceKind.transcript,
             "Session transcript envelope",
             "session:envelope",
@@ -91,6 +95,7 @@ def _assemble_evidence(
             },
         ),
         _ref(
+            transcript.source_adapter,
             EvidenceKind.git,
             "Current Git snapshot",
             "git:head",
@@ -102,9 +107,13 @@ def _assemble_evidence(
             },
         ),
     ]
-    refs.extend(_attempt_ref(attempt) for attempt in transcript.tool_attempts)
+    refs.extend(
+        _attempt_ref(transcript.source_adapter, attempt)
+        for attempt in transcript.tool_attempts
+    )
     refs.extend(
         _ref(
+            transcript.source_adapter,
             EvidenceKind.git,
             f"Current state of {state.path}",
             f"git:path:{state.path}",
@@ -126,7 +135,7 @@ def _attempt_claims(
     observations: list[Observation] = []
     uncertainties: list[Uncertainty] = []
     for index, attempt in enumerate(transcript.tool_attempts, start=1):
-        evidence_id = _attempt_ref(attempt).id
+        evidence_id = _attempt_ref(transcript.source_adapter, attempt).id
         observations.append(
             Observation(
                 id=f"recorded-attempt-{index}",
@@ -170,10 +179,10 @@ def _attempt_claims(
     return observations, uncertainties
 
 
-def _path_claims(snapshot: GitSnapshot) -> list[Observation]:
+def _path_claims(adapter: SourceAdapter, snapshot: GitSnapshot) -> list[Observation]:
     claims: list[Observation] = []
     for index, state in enumerate(snapshot.path_states, start=1):
-        evidence_id = _evidence_id(EvidenceKind.git, f"git:path:{state.path}")
+        evidence_id = _evidence_id(adapter, EvidenceKind.git, f"git:path:{state.path}")
         if state.differs_from_head:
             statement = f"Current repository path '{state.path}' differs from HEAD."
         elif state.exists:
@@ -194,7 +203,8 @@ def _path_claims(snapshot: GitSnapshot) -> list[Observation]:
 def _readiness(
     transcript: TranscriptEvidence, snapshot: GitSnapshot
 ) -> tuple[ReadinessCheck, ...]:
-    git_evidence = _evidence_id(EvidenceKind.git, "git:head")
+    adapter = transcript.source_adapter
+    git_evidence = _evidence_id(adapter, EvidenceKind.git, "git:head")
     checks: list[ReadinessCheck] = [
         ReadinessCheck(
             id="worktree",
@@ -245,7 +255,7 @@ def _readiness(
                 status=status,
                 detail=detail,
                 evidence_ids=tuple(
-                    _attempt_ref(item).id for item in verification_attempts
+                    _attempt_ref(adapter, item).id for item in verification_attempts
                 ),
             )
         )
@@ -267,7 +277,9 @@ def _readiness(
                 if state.exists
                 else "Recorded file is absent from the current worktree."
             ),
-            evidence_ids=(_evidence_id(EvidenceKind.git, f"git:path:{state.path}"),),
+            evidence_ids=(
+                _evidence_id(adapter, EvidenceKind.git, f"git:path:{state.path}"),
+            ),
         )
         for index, state in enumerate(snapshot.path_states, start=1)
     )
@@ -310,16 +322,16 @@ def _actions(needs_verification: bool) -> tuple[ContinuationAction, ...]:
     return tuple(actions)
 
 
-def recover_session(
-    transcript_path: Path,
+def recover_evidence(
+    transcript: TranscriptEvidence,
     repo: Path,
     *,
     generated_at: datetime | None = None,
 ) -> RecoveryBrief:
-    """Build a verified recovery brief from a local transcript and Git snapshot.
+    """Build a verified recovery brief from normalized evidence and Git state.
 
     Args:
-        transcript_path: Local Claude Code JSONL transcript.
+        transcript: Provider-normalized structural transcript evidence.
         repo: Owner-selected trusted repository path.
         generated_at: Optional deterministic generation time for tests and fixtures.
 
@@ -327,12 +339,10 @@ def recover_session(
         Versioned recovery brief with linked evidence and safe actions.
 
     Raises:
-        OSError: If the transcript cannot be read.
         RecoveryGitError: If the trusted repository cannot be inspected.
         UnsafeRecoveryPathError: If transcript path data is unsafe.
     """
 
-    transcript = extract_transcript_evidence(transcript_path)
     snapshot = inspect_git(
         repo,
         tuple(item.path for item in transcript.touched_paths),
@@ -345,10 +355,16 @@ def recover_session(
             id="recorded-intent",
             statement="A session intent was recorded in the transcript.",
             certainty=Certainty.observed,
-            evidence_ids=(_evidence_id(EvidenceKind.transcript, "session:envelope"),),
+            evidence_ids=(
+                _evidence_id(
+                    transcript.source_adapter,
+                    EvidenceKind.transcript,
+                    "session:envelope",
+                ),
+            ),
         ),
     )
-    observations.extend(_path_claims(snapshot))
+    observations.extend(_path_claims(transcript.source_adapter, snapshot))
     needs_verification = any(
         attempt.name == "Bash" and attempt.result_status is not ResultStatus.recorded
         for attempt in transcript.tool_attempts
@@ -362,10 +378,25 @@ def recover_session(
         head=snapshot.head,
         ending="unknown",
         intent=transcript.intent,
-        source_adapter=ADAPTER,
+        source_adapter=transcript.source_adapter,
         observations=tuple(observations),
         uncertainties=tuple(uncertainties),
         readiness=_readiness(transcript, snapshot),
         actions=_actions(needs_verification),
         evidence=evidence,
+    )
+
+
+def recover_session(
+    transcript_path: Path,
+    repo: Path,
+    *,
+    generated_at: datetime | None = None,
+) -> RecoveryBrief:
+    """Build a recovery brief from a backward-compatible Claude transcript."""
+
+    return recover_evidence(
+        extract_transcript_evidence(transcript_path),
+        repo,
+        generated_at=generated_at,
     )

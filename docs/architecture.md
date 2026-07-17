@@ -24,9 +24,12 @@ decision.
 - `resume/` — transcript ending detection, narrative `ResumePacket` v1, and
   provider-specific structural evidence extraction. Evidence extraction strips
   Bash commands and tool-result bodies before crossing into recovery.
-- `recovery/` — provider-neutral `RecoveryBrief` v1, fixed read-only Git
-  inspection, path-containment checks, evidence assembly, and safe prompt
-  rendering. It does not import or modify `ledger/`.
+- `recovery/` — provider-neutral `RecoveryBrief` v1, declared versioned Claude
+  Code and Codex adapters, repository-bound session discovery, fixed read-only
+  Git inspection, path-containment checks, evidence assembly, and safe prompt
+  rendering. Provider call bodies remain private; structural results cross the
+  adapter boundary only when paired by exact call ID. It does not import or
+  modify `ledger/`.
 - `api/` — capability-protected localhost recovery console. Packaged static
   assets, no CORS, no external resources, and no mutation endpoints.
 - `demo/` — disposable synthetic before/after Git scenario using the same
@@ -116,6 +119,13 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
     demo reports a missing verification result as unknown, rejects unsafe
     paths, serves only through a secured localhost capability, and passes the
     installed-wheel smoke path.
+  - **Recovery Loop v1 Packet 1 (2026-07-18, ADR 0004).** Adds the versioned
+    provider adapter seam, exact Codex call/output pairing, strict canonical
+    candidate-to-repository binding, and safe normalization of contained
+    absolute paths. A structure-only run against the real recovered Codex
+    rollout observed 277 attempts, 276 matched outputs, and one unmatched
+    attempt, producing an honest `interrupted` classification without retaining
+    raw call arguments or outputs.
 - **M4 — budget wallet (former M3, content unchanged).** Per-agent token
   budgets; enforcement hook + Desk endpoint. *Gated by:* M2.5 (FS-2
   decision) AND attribution rescope #2 (per-project spend must cross the

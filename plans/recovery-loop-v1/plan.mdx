@@ -11,6 +11,48 @@ Build one closed recovery loop, not a broader agent dashboard. An operator start
 
 The slice is complete when the current real Codex session can be discovered without exposing raw transcript content, its unmatched tool call is shown as unknown, repository-contained absolute paths reconcile safely, an explicit owner-supplied command produces a freshness-aware process receipt, and the browser downloads a canonical package containing the brief, safe prompt, receipt, and checksum manifest.
 
+## Requirements
+
+### REQ-recovery-loop-v1-001 [F][MUST] conf=100
+
+- **Statement:** When Agent Ledger reads a supported local transcript, the system shall normalize provider-specific tool calls and outputs through a declared versioned adapter and pair results only by exact call ID.
+- **Acceptance:** A sanitized Codex fixture with one matched call and one unmatched call yields `recorded` and `missing` respectively; a call's own `status: completed` never substitutes for an output.
+- **Test:** `tests/test_recovery_adapters.py::test_codex_pairs_outputs_by_call_id_without_trusting_call_status`
+- **Trace:** Packet 1 → `recovery/adapters/base.py`, `recovery/adapters/codex.py`.
+- **Status:** verified
+- [x] confirmed by user (2026-07-18)
+- [x] verified by fixture and real-session structural dogfood (2026-07-18)
+
+### REQ-recovery-loop-v1-002 [S][MUST] conf=100
+
+- **Statement:** When a repository-scoped catalog is assembled, the system shall include a session only when adapter-recorded cwd evidence canonically resolves to the owner-selected Git root.
+- **Acceptance:** A same-name session from another repository and a session without cwd evidence are excluded; no project-name heuristic can bind them.
+- **Test:** `tests/test_recovery_adapters.py::test_discovery_excludes_unbound_and_mismatched_sessions`
+- **Trace:** Packet 1 → `recovery/discovery.py`.
+- **Status:** verified
+- [x] confirmed by user (2026-07-18)
+- [x] verified by repository-binding tests and real-session discovery (2026-07-18)
+
+### REQ-recovery-loop-v1-003 [S][MUST] conf=100
+
+- **Statement:** When transcript evidence names an absolute path, the system shall convert it to repository-relative form only after canonical containment is proven against the owner-selected Git root.
+- **Acceptance:** Absolute paths inside the root normalize; outside paths, sibling worktrees, traversal, option-like paths, backslashes, and symlink escapes fail before per-path Git inspection.
+- **Test:** `tests/test_recovery.py::test_recovery_accepts_contained_absolute_path` plus the unsafe-path parameter matrix.
+- **Trace:** Packet 1 → `recovery/git_state.py`.
+- **Status:** verified
+- [x] confirmed by user (2026-07-18)
+- [x] verified by containment and escape-case tests (2026-07-18)
+
+### REQ-recovery-loop-v1-004 [P][MUST] conf=100
+
+- **Statement:** While normalizing transcript evidence, the system shall retain structural identifiers and redacted locators but shall not retain raw command arguments or tool-output bodies in public candidate or evidence models.
+- **Acceptance:** Credential-like fixture strings and current-session raw arguments/output are absent from serialized evidence, logs, tests, and committed fixtures.
+- **Test:** `tests/test_recovery_adapters.py::test_codex_evidence_omits_private_call_bodies`
+- **Trace:** Packet 1 → adapter fixtures and structure-only real-session dogfood.
+- **Status:** verified
+- [x] confirmed by user (2026-07-18)
+- [x] verified by serialized-evidence privacy tests and structure-only dogfood (2026-07-18)
+
 <Callout id="scope-cut" tone="decision">
 This is Recovery Loop v1. It deliberately closes one end-to-end job—discover, inspect, verify, hand off—before adding background monitoring, cloud sync, agent orchestration, or another provider. The frozen `src/agent_ledger/ledger/` package remains untouched.
 </Callout>

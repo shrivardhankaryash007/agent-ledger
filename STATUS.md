@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-18 (Recovery Loop v1 plan verified and awaiting owner approval; no source implementation started)
+Last updated: 2026-07-18 (Recovery Loop v1 Packet 1 implemented and verified)
 
 ## Current Baseline
 
@@ -20,13 +20,12 @@ Last updated: 2026-07-18 (Recovery Loop v1 plan verified and awaiting owner appr
   fixed and read-only, unsafe paths fail closed, and the localhost console is
   protected by capability token, Host/Origin allowlists, no CORS, no-store,
   and restrictive CSP.
-- **Recovery Loop v1 is planned, not implemented** (2026-07-18):
-  `plans/recovery-loop-v1/` defines a repository-bound Claude Code + Codex
-  Recovery Inbox, safe absolute-path reconciliation, content-sensitive command
-  receipts, and a canonical recovery package. The plan, wireframes, and
-  prototype pass the local Agent-Native schema/bridge checks. A skeptical
-  review's false-green findings were incorporated; source changes remain paused
-  at the approval gate.
+- **Recovery Loop v1 Packet 1 is implemented and verified** (2026-07-18,
+  ADR 0004): the provider-neutral adapter seam supports declared Claude Code
+  and Codex JSONL formats, Codex calls pair with outputs only by exact call ID,
+  discovery binds candidates to the exact trusted Git root, and contained
+  absolute paths normalize safely. Raw call arguments and output bodies do not
+  enter public evidence models. Packets 2-4 remain to be implemented.
 
 ## Verification
 
@@ -39,8 +38,12 @@ The complete project gate passes (Ruff format, Ruff check, MyPy strict, and PyTe
 .venv/bin/pytest
 ```
 
-Result (2026-07-18, handoff checkpoint): 62 tests passing, 85.69% total
-coverage. The real localhost smoke cycle starts, fetches all product endpoints,
+Result (2026-07-18, Packet 1 checkpoint): 70 tests passing, 86.15% total
+coverage; Ruff format/check and MyPy strict also pass. Structure-only dogfood
+against the real recovered Codex rollout found 277 tool attempts, 276 matched
+outputs, and one unmatched attempt; the adapter classified it as interrupted
+and discovered it only within the trusted repository boundary. The real
+localhost smoke cycle starts, fetches all product endpoints,
 stops, and cleans its synthetic repository. Browser review passes at 1440px
 desktop and 390px mobile; the mobile document has no horizontal overflow,
 keyboard skip/copy works, and the console reports zero errors or warnings. A
@@ -64,16 +67,16 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
   threshold is >=80%.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
-- Claude Code commonly records absolute file paths. `RecoveryBrief` v1 rejects
-  them by design; Recovery Loop v1 now has a reviewed containment policy, but
-  that policy is not implemented yet.
-- Only `claude-code-jsonl@1` is implemented. Codex and Gemini adapters remain
-  absent. Recovery Loop v1 scopes Codex next; Gemini remains deferred.
+- The Recovery Loop browser still opens one preassembled brief; the planned
+  immutable multi-provider Inbox and lazy selected-session assembly are not yet
+  connected to the API or UI.
+- Command receipts, content-sensitive freshness, and the canonical recovery
+  package are not yet implemented. Gemini remains deliberately deferred.
 
 ## Next Useful Work
 
-- Review and approve `plans/recovery-loop-v1/`; after approval, implement Packet
-  1 by writing the failing Codex call-pairing, repository-binding, and absolute
-  path-containment tests before source changes. The public demo video, M3.c
-  passive dogfood, attribution rescope, and Penny capture integration remain
-  deferred behind this explicit approval gate.
+- Implement Recovery Loop v1 Packet 2 test-first: change the localhost console
+  from one preassembled brief to an immutable repository-bound candidate Inbox,
+  preserve the existing single-brief compatibility path, and add lazy
+  digest-checked selected-session assembly. The public demo video, M3.c passive
+  dogfood, attribution rescope, and Penny capture integration remain deferred.

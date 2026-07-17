@@ -3,59 +3,20 @@
 from __future__ import annotations
 
 import json
-from enum import StrEnum
 from pathlib import Path
 from typing import cast
 
-from pydantic import BaseModel, ConfigDict
-
+from agent_ledger.recovery.adapters.base import (
+    ResultStatus,
+    ToolAttempt,
+    TouchedPath,
+    TranscriptEvidence,
+)
+from agent_ledger.recovery.models import SourceAdapter
 from agent_ledger.resume.detector import parse_timestamp
 
 FILE_TOUCHING_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
-
-
-class ResultStatus(StrEnum):
-    """Conservative status of a recorded tool attempt."""
-
-    recorded = "recorded"
-    error = "error"
-    missing = "missing"
-
-
-class EvidenceModel(BaseModel):
-    """Immutable internal evidence model."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-
-class ToolAttempt(EvidenceModel):
-    """A tool invocation stripped of its untrusted input and output bodies."""
-
-    tool_use_id: str
-    name: str
-    line_number: int
-    result_status: ResultStatus
-    result_line_number: int | None = None
-
-
-class TouchedPath(EvidenceModel):
-    """A path named by a known file-touching tool."""
-
-    path: str
-    line_number: int
-    tool_use_id: str
-
-
-class TranscriptEvidence(EvidenceModel):
-    """Provider-specific structural evidence consumed by the neutral assembler."""
-
-    session_id: str
-    project: str
-    intent: str
-    last_timestamp: str
-    tool_attempts: tuple[ToolAttempt, ...]
-    touched_paths: tuple[TouchedPath, ...]
-    skipped_lines: int
+CLAUDE_SOURCE_ADAPTER = SourceAdapter(name="claude-code-jsonl", version=1)
 
 
 def _message(record: dict[object, object]) -> dict[object, object] | None:
@@ -127,6 +88,7 @@ def extract_transcript_evidence(path: Path) -> TranscriptEvidence:
     records, skipped = _decode_lines(path)
     session_id = path.stem
     project = path.parent.name
+    recorded_cwd: str | None = None
     intent = "No user intent was recoverable from the transcript."
     last_timestamp = ""
     attempts: list[tuple[str, str, int]] = []
@@ -140,6 +102,7 @@ def extract_transcript_evidence(path: Path) -> TranscriptEvidence:
         cwd = record.get("cwd")
         if isinstance(cwd, str) and cwd:
             project = Path(cwd).name
+            recorded_cwd = cwd
         timestamp = record.get("timestamp")
         if isinstance(timestamp, str):
             try:
@@ -199,10 +162,13 @@ def extract_transcript_evidence(path: Path) -> TranscriptEvidence:
         for tool_use_id, name, line_number in attempts
     )
     return TranscriptEvidence(
+        source_adapter=CLAUDE_SOURCE_ADAPTER,
+        provider="claude-code",
         session_id=session_id,
         project=project,
         intent=intent,
         last_timestamp=last_timestamp,
+        recorded_cwd=recorded_cwd,
         tool_attempts=tool_attempts,
         touched_paths=tuple(touched_paths),
         skipped_lines=skipped,
