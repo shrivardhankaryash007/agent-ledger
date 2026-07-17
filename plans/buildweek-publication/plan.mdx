@@ -1,0 +1,22 @@
+---
+title: "Publish Agent Ledger for OpenAI Build Week"
+brief: "Prepare the existing Agent Ledger repository for a verifiable Build Week submission and publish it to the owner's GitHub account."
+kind: "plan"
+localOnly: true
+---
+
+<Callout tone="decision">
+The repository will remain a single local-first Python project. Publication changes are documentation and release metadata only: no changes to the frozen `ledger/` core, ingestion behavior, or private transcript data.
+</Callout>
+
+<Callout tone="risk">
+A public repository makes the source visible permanently and a private repository requires judge access to be granted to `testing@devpost.com` and `build-week-event@openai.com`. The owner must choose visibility before repository creation.
+</Callout>
+
+<Table columns={["Scope", "Included", "Deferred"]} rows={[["Build Week proof", "README note describing Codex and GPT-5.6 use; exact runnable instructions", "New product functionality or a public demo"], ["GitHub", "Create repository, add origin, commit, push", "Pull request workflow or release automation"], ["Submission", "Paste the resulting repository URL into Devpost", "Final Devpost submission and video upload"]]} />
+
+<FileTree entries={[{path:"README.md",change:"modified",note:"Add a concise Build Week / Codex provenance section without overstating unbuilt work."},{path:"plans/buildweek-publication/plan.mdx",change:"added",note:"Approval gate and publication record."},{path:".github/workflows/ci.yml",change:"checked",note:"Confirm existing CI remains suitable after publication."}]} />
+
+<Checklist items={[{id:"readme",label:"README accurately describes Codex and GPT-5.6 use and keeps the local-first privacy boundary explicit."},{id:"verification",label:"Run the existing complete project gate before publication."},{id:"visibility",label:"Owner chooses public or private visibility before repository creation."},{id:"push",label:"Repository is created under shrivardhankaryash007, origin is configured, and the verified commit is pushed."},{id:"devpost",label:"Repository URL is entered in Devpost; do not final-submit the challenge entry."}]} />
+
+<QuestionForm questions={[{id:"repo_visibility",title:"GitHub repository visibility",mode:"single",options:[{label:"Public",value:"public"},{label:"Private",value:"private"}]}]} />

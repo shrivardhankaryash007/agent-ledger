@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-14 (M3.b built and verified)
+Last updated: 2026-07-17 (Build Week repository push blocked)
 
 ## Current Baseline
 
@@ -32,14 +32,20 @@ private packet was removed immediately and was not committed.
 
 ## Dirty / In-Flight State
 
-- Clean as of the M3.a session-end commit (`2b21a0a`). No in-flight changes.
+- Build Week publication commit is ready locally: `README.md` adds factual
+  Codex/GPT-5.6 provenance and `plans/buildweek-publication/plan.mdx` records
+  the approved scope. The public remote
+  `https://github.com/shrivardhankaryash007/agent-ledger` exists, but the
+  push is blocked until GitHub authorization includes the `workflow` scope
+  needed for the existing CI workflow.
 
 ## Known Gaps
 
 - **Per-project attribution remains below threshold after rescope:** 57.8%
   of call volume is now project-specific on the real corpus, but the M0 kill
   threshold is >=80%.
-- M3.b (packet generation and rendering) is not yet implemented.
+- A Build Week-ready demo video is not yet available; final Devpost submission
+  remains intentionally deferred.
 
 ## Next Useful Work
 

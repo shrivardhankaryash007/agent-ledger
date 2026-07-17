@@ -47,6 +47,17 @@ uv run agent-ledger ingest ~/.claude/projects
 uv run agent-ledger report
 ```
 
+## OpenAI Build Week
+
+The Build Week extension focuses on continuity for interrupted coding agents:
+the `agent-ledger resume` flow reconstructs an evidence-backed handoff packet
+from local session and Git evidence. Codex with GPT-5.6 was used to develop the
+M3.b packet generator and deterministic renderer; the primary implementation
+session is `019f5f12-2a4a-7b43-a3a4-15ea1ec2a203`.
+
+This repository deliberately keeps raw coding transcripts local. The public
+code and tests use no private transcripts or credentials.
+
 ## Design principles
 
 See `~/dev/standards/coding-constitution/CODING-CONSTITUTION.md` (this repo
