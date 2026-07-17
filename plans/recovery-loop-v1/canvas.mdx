@@ -1,0 +1,253 @@
+{/* Canvas source. */}
+
+<DesignBoard title="Agent Ledger Recovery Loop" version={2}>
+  <Section
+    id="recovery-flow"
+    title="Recovery Inbox → evidence brief → current command receipt"
+    subtitle="The current flight-recorder console grows into a local recovery workflow without changing its industrial editorial character."
+  >
+    <Artboard
+      id="recovery-inbox"
+      label="Recovery Inbox — interrupted work ranked by evidence"
+      surface="browser"
+      order={1}
+    >
+      <Screen
+        surface="browser"
+        caption="A repository-scoped inbox appears when the operator starts the local console."
+        html={`<div style="display:flex;flex-direction:column;box-sizing:border-box;height:100%;padding:16px;gap:14px">
+  <header style="display:flex;align-items:center;width:100%;gap:10px;border-bottom:1.4px solid var(--wf-line);padding-bottom:12px;white-space:nowrap">
+    <strong>AL / AGENT LEDGER</strong>
+    <span class="wf-pill accent">RECOVERY INBOX</span>
+    <div style="flex:1"></div>
+    <span class="wf-pill">LOCAL / READ ONLY</span>
+  </header>
+  <section style="display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:14px;align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <small>TRUSTED REPOSITORY</small>
+      <h1 style="margin:0">Interrupted work,<br/>ranked by evidence.</h1>
+      <p class="wf-muted" style="margin:0">Choose a session. Agent Ledger reconciles its recorded activity against recovery-demo as it exists now.</p>
+    </div>
+    <div class="wf-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:10px">
+      <small>RECOVERY QUEUE</small>
+      <strong style="font-size:2rem">03</strong>
+      <span class="wf-pill accent">1 NEEDS REVIEW</span>
+    </div>
+  </section>
+  <div style="display:flex;gap:6px;white-space:nowrap;overflow:hidden">
+    <span class="wf-pill accent">ALL 3</span>
+    <span class="wf-pill">INTERRUPTED 1</span>
+    <span class="wf-pill">UNKNOWN 1</span>
+    <span class="wf-pill">VERIFIED 1</span>
+    <div style="flex:1"></div>
+    <span class="wf-muted">CLAUDE CODE + CODEX</span>
+  </div>
+  <main class="wf-card" style="display:flex;flex-direction:column;gap:0;padding:0;flex:1;min-height:0">
+    <div style="display:grid;grid-template-columns:110px minmax(0,1.5fr) minmax(0,1fr) 130px 130px;gap:10px;padding:9px 12px;border-bottom:1.4px solid var(--wf-line);white-space:nowrap">
+      <small>PROVIDER</small><small>SESSION</small><small>LAST SIGNAL</small><small>READINESS</small><small>ACTION</small>
+    </div>
+    <div style="display:grid;grid-template-columns:110px minmax(0,1.5fr) minmax(0,1fr) 130px 130px;gap:10px;align-items:center;padding:12px;border-bottom:1.4px solid var(--wf-line);min-width:0">
+      <span class="wf-pill accent">CODEX</span>
+      <div style="min-width:0"><strong>buildweek-recovery-demo</strong><br/><small class="wf-muted">17 Jul · main · recovery-demo</small></div>
+      <div style="min-width:0"><strong>Tool call has no result</strong><br/><small class="wf-muted">1 unmatched call ID</small></div>
+      <span class="wf-pill">REVIEW</span>
+      <button class="primary" data-goto="recovery-brief">Open recovery</button>
+    </div>
+    <div style="display:grid;grid-template-columns:110px minmax(0,1.5fr) minmax(0,1fr) 130px 130px;gap:10px;align-items:center;padding:12px;border-bottom:1.4px solid var(--wf-line);min-width:0">
+      <span class="wf-pill">CLAUDE</span>
+      <div style="min-width:0"><strong>recovery-demo-previous</strong><br/><small class="wf-muted">16 Jul · main · recovery-demo</small></div>
+      <div style="min-width:0"><strong>Result recorded</strong><br/><small class="wf-muted">Worktree changed since</small></div>
+      <span class="wf-pill">STALE</span>
+      <button>Inspect</button>
+    </div>
+    <div style="display:grid;grid-template-columns:110px minmax(0,1.5fr) minmax(0,1fr) 130px 130px;gap:10px;align-items:center;padding:12px;min-width:0">
+      <span class="wf-pill">CODEX</span>
+      <div style="min-width:0"><strong>recovery-demo-active</strong><br/><small class="wf-muted">18 Jul · main · recovery-demo</small></div>
+      <div style="min-width:0"><strong>Session active</strong><br/><small class="wf-muted">No interruption inferred</small></div>
+      <span class="wf-pill">ACTIVE</span>
+      <button>Inspect</button>
+    </div>
+  </main>
+  <footer style="display:flex;align-items:center;width:100%;gap:10px;border-top:1.4px solid var(--wf-line);padding-top:10px;white-space:nowrap">
+    <small>3 REPOSITORY-BOUND SESSIONS / 2 MISMATCHED SESSIONS EXCLUDED</small><div style="flex:1"></div><button>Refresh receipts</button>
+  </footer>
+</div>`}
+      />
+    </Artboard>
+
+    <Artboard
+      id="recovery-brief"
+      label="Selected recovery — recorded activity versus repository truth"
+      surface="browser"
+      order={2}
+    >
+      <Screen
+        surface="browser"
+        caption="The existing evidence brief becomes the selected-session workspace."
+        html={`<div style="display:flex;flex-direction:column;box-sizing:border-box;height:100%;padding:16px;gap:14px">
+  <header style="display:flex;align-items:center;width:100%;gap:10px;border-bottom:1.4px solid var(--wf-line);padding-bottom:12px;white-space:nowrap">
+    <button data-goto="recovery-inbox"><span data-icon="arrowLeft" aria-label="Back"></span> Inbox</button>
+    <strong>AL / RECOVERY BRIEF</strong>
+    <div style="flex:1"></div>
+    <span class="wf-pill">CODEX</span>
+    <span class="wf-pill accent">REVIEW REQUIRED</span>
+  </header>
+  <section style="display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:14px;align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <small>INTERRUPTED SESSION / VERIFIED RECOVERY</small>
+      <h1 style="margin:0">The transcript remembers.<br/>The repository decides.</h1>
+      <p class="wf-muted" style="margin:0">A current-state brief for the next agent, with every claim tied to local evidence.</p>
+    </div>
+    <div class="wf-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:8px;background:var(--wf-warn)">
+      <strong style="font-size:2rem">!</strong><small>VERIFICATION UNKNOWN</small><span class="wf-pill">1 OPEN SIGNAL</span>
+    </div>
+  </section>
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1.4px solid var(--wf-line)">
+    <div style="padding:8px"><small>SESSION</small><br/><strong>buildweek-recovery-demo</strong></div>
+    <div style="padding:8px;border-left:1.4px solid var(--wf-line)"><small>PROJECT</small><br/><strong>recovery-demo</strong></div>
+    <div style="padding:8px;border-left:1.4px solid var(--wf-line)"><small>BRANCH</small><br/><strong>main</strong></div>
+    <div style="padding:8px;border-left:1.4px solid var(--wf-line)"><small>HEAD</small><br/><strong>d86ddc97b179</strong></div>
+    <div style="padding:8px;border-left:1.4px solid var(--wf-line)"><small>ADAPTER</small><br/><strong>codex-jsonl@1</strong></div>
+  </div>
+  <main style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0">
+    <section class="wf-card" style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><span class="wf-pill">01</span><div><small>THEN / TRANSCRIPT</small><h2 style="margin:0">Recorded activity</h2></div></div>
+      <div class="wf-box"><small>RECORDED INTENT</small><p style="margin:6px 0 0">Make the verification signal honest after an interrupted coding session.</p></div>
+      <div style="border-top:1.4px solid var(--wf-line);padding-top:8px"><strong>Tool attempt recorded: exec</strong><br/><small class="wf-muted">EVIDENCE / ev-5f640…</small></div>
+      <div style="border-top:1.4px solid var(--wf-line);padding-top:8px"><strong>No matching output for call ID</strong><br/><small class="wf-muted">EVIDENCE / ev-5f640…</small></div>
+    </section>
+    <section class="wf-card" style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><span class="wf-pill">02</span><div><small>NOW / GIT</small><h2 style="margin:0">Current proof</h2></div></div>
+      <div style="border-top:1.4px solid var(--wf-line);padding-top:8px"><strong>src/check.py differs from HEAD</strong><br/><small class="wf-muted">EVIDENCE / git-a6b9…</small></div>
+      <div class="wf-box" style="border-left:5px solid var(--wf-warn)"><small>DO NOT ASSUME</small><p style="margin:6px 0 0">The recorded command succeeded, or the interrupted session caused the current difference.</p></div>
+      <div style="display:flex;gap:8px;margin-top:auto"><button>Copy safe prompt</button><button class="primary" data-goto="receipt-missing">Open handoff</button></div>
+    </section>
+  </main>
+</div>`}
+      />
+    </Artboard>
+
+    <Artboard
+      id="receipt-missing"
+      label="Handoff status — no current command receipt"
+      surface="browser"
+      order={3}
+    >
+      <Screen
+        surface="browser"
+        caption="The package remains downloadable, but its missing status is impossible to mistake for verification."
+        html={`<div style="display:flex;flex-direction:column;box-sizing:border-box;height:100%;padding:16px;gap:14px">
+  <header style="display:flex;align-items:center;width:100%;gap:10px;border-bottom:1.4px solid var(--wf-line);padding-bottom:12px;white-space:nowrap"><button data-goto="recovery-brief"><span data-icon="arrowLeft" aria-label="Back"></span> Recovery brief</button><strong>AL / RECOVERY PACKAGE</strong><div style="flex:1"></div><span class="wf-pill">LOCAL</span><span class="wf-pill accent">RECEIPT MISSING</span></header>
+  <section style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px"><div><small>COMMAND RECEIPT / v1</small><h1 style="margin:6px 0">One honest step remains.</h1><p class="wf-muted" style="margin:0">The brief is ready. No current owner-supplied command result is attached.</p></div><div class="wf-card" style="display:flex;flex-direction:column;justify-content:space-between;background:var(--wf-warn)"><strong style="font-size:2rem">?</strong><small>OUTCOME UNKNOWN</small><span class="wf-pill">NO RECEIPT</span></div></section>
+  <main style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1"><section class="wf-card" style="display:flex;flex-direction:column;gap:10px"><small>OWNER ACTION</small><h2 style="margin:0">Run a command you choose.</h2><div class="wf-box"><code>agent-ledger verify --session ses-42a7 --repo . --label owner-note -- uv run pytest -q</code></div><p class="wf-muted">The owner note is annotation, not a claim. Transcript text never enters argv, and the browser never launches the process.</p><button style="margin-top:auto">Refresh receipts</button></section><section class="wf-card" style="display:flex;flex-direction:column;gap:10px"><small>RECOVERY PACKAGE</small><div class="wf-box"><strong>Brief + safe prompt</strong><br/><small class="wf-muted">Ready</small></div><div class="wf-box"><strong>Latest command receipt</strong><br/><small class="wf-muted">Missing</small></div><div class="wf-box"><strong>Checksum manifest</strong><br/><small class="wf-muted">Ready</small></div><p class="wf-muted">Package status: missing receipt</p><button class="primary" style="margin-top:auto">Download recovery package</button></section></main>
+</div>`}
+      />
+    </Artboard>
+
+    <Artboard
+      id="recovery-receipt"
+      label="Current command receipt — portable recovery package"
+      surface="browser"
+      order={4}
+    >
+      <Screen
+        surface="browser"
+        caption="A current receipt records an observed process exit without claiming what the command semantically proved."
+        html={`<div style="display:flex;flex-direction:column;box-sizing:border-box;height:100%;padding:16px;gap:14px">
+  <header style="display:flex;align-items:center;width:100%;gap:10px;border-bottom:1.4px solid var(--wf-line);padding-bottom:12px;white-space:nowrap">
+    <button data-goto="recovery-brief"><span data-icon="arrowLeft" aria-label="Back"></span> Recovery brief</button>
+    <strong>AL / RECOVERY PACKAGE</strong>
+    <div style="flex:1"></div>
+    <span class="wf-pill">LOCAL PACKAGE</span>
+    <span class="wf-pill accent">CURRENT</span>
+  </header>
+  <section style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;align-items:stretch">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <small>RECOVERY RECEIPT / v1</small>
+      <h1 style="margin:0">Current after interruption.</h1>
+      <p class="wf-muted" style="margin:0">The explicit owner-supplied command exited 0 against the repository fingerprint shown below.</p>
+    </div>
+    <div class="wf-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:8px;background:var(--wf-ok)">
+      <strong style="font-size:2rem">0</strong><small>COMMAND EXITED 0</small><span class="wf-pill">CURRENT SNAPSHOT</span>
+    </div>
+  </section>
+  <main style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:14px;flex:1;min-height:0">
+    <section class="wf-card" style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><span class="wf-pill accent">RECEIPT</span><strong>Owner label / project verification</strong></div>
+      <div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;border-top:1.4px solid var(--wf-line);padding-top:10px"><small>OBSERVED OUTCOME</small><strong>EXITED 0</strong></div>
+      <div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;border-top:1.4px solid var(--wf-line);padding-top:10px"><small>EXECUTABLE</small><strong>uv · 3 arguments · argv digest recorded</strong></div>
+      <div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;border-top:1.4px solid var(--wf-line);padding-top:10px"><small>REPOSITORY</small><strong>main · d86ddc97b179 · content fingerprint matched</strong></div>
+      <div style="display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px;border-top:1.4px solid var(--wf-line);padding-top:10px"><small>BOUNDARY</small><strong>No transcript command, stdout, or stderr retained</strong></div>
+      <div class="wf-box" style="margin-top:auto"><small>LIMIT</small><p style="margin:6px 0 0">Current means repository content has not drifted. The package does not contain raw argv and cannot independently reproduce what ran.</p></div>
+    </section>
+    <section class="wf-card" style="display:flex;flex-direction:column;gap:10px;min-width:0">
+      <small>HANDOFF PACKAGE</small>
+      <h2 style="margin:0">One artifact.<br/>Four records.</h2>
+      <div class="wf-box"><strong>RecoveryBrief v1</strong><br/><small class="wf-muted">Recorded facts, current Git state, uncertainty</small></div>
+      <div class="wf-box"><strong>Safe continuation prompt</strong><br/><small class="wf-muted">Application-authored actions only</small></div>
+      <div class="wf-box"><strong>RecoveryReceipt v1</strong><br/><small class="wf-muted">Observed process outcome and freshness</small></div>
+      <div class="wf-box"><strong>Checksum manifest</strong><br/><small class="wf-muted">Canonical SHA-256 consistency checks</small></div>
+      <button class="primary" style="margin-top:auto">Download recovery package</button>
+    </section>
+  </main>
+  <footer style="display:flex;align-items:center;width:100%;gap:10px;border-top:1.4px solid var(--wf-line);padding-top:10px;white-space:nowrap">
+    <small>RAW PRIVATE MATERIAL STAYS LOCAL</small><div style="flex:1"></div><button>Copy safe prompt</button>
+  </footer>
+</div>`}
+      />
+    </Artboard>
+
+    <Artboard
+      id="recovery-inbox-narrow"
+      label="Recovery Inbox — 390px responsive state"
+      surface="mobile"
+      order={5}
+    >
+      <Screen
+        surface="mobile"
+        caption="The narrow layout becomes a stacked decision list; fixed desktop grids do not squeeze into the viewport."
+        html={`<div style="display:flex;flex-direction:column;box-sizing:border-box;height:100%;padding:16px;gap:12px">
+  <header style="display:flex;align-items:center;width:100%;gap:8px;border-bottom:1.4px solid var(--wf-line);padding-bottom:10px;white-space:nowrap"><strong>AL</strong><span class="wf-pill accent">RECOVERY</span><div style="flex:1"></div><span class="wf-pill">LOCAL</span></header>
+  <section><small>TRUSTED REPOSITORY</small><h1 style="margin:5px 0">Interrupted work.</h1><p class="wf-muted" style="margin:0">recovery-demo · 3 bound sessions</p></section>
+  <div style="display:flex;gap:6px;overflow:hidden;white-space:nowrap"><span class="wf-pill accent">ALL 3</span><span class="wf-pill">REVIEW 1</span><span class="wf-pill">STALE 1</span></div>
+  <main style="display:flex;flex-direction:column;gap:10px;flex:1;min-height:0">
+    <article class="wf-card" style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;gap:6px"><span class="wf-pill accent">CODEX</span><span class="wf-pill">REVIEW</span></div><strong>buildweek-recovery-demo</strong><small class="wf-muted">Tool call has no matching result</small><button class="primary">Open recovery</button></article>
+    <article class="wf-card" style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;gap:6px"><span class="wf-pill">CLAUDE</span><span class="wf-pill">STALE</span></div><strong>recovery-demo-previous</strong><small class="wf-muted">Repository content changed since receipt</small><button>Inspect</button></article>
+  </main>
+  <footer style="display:flex;align-items:center;width:100%;border-top:1.4px solid var(--wf-line);padding-top:10px"><small>2 MISMATCHED EXCLUDED</small><div style="flex:1"></div><button><span data-icon="dots" aria-label="More"></span></button></footer>
+</div>`}
+      />
+    </Artboard>
+  </Section>
+
+  <Annotation
+    id="inbox-boundary"
+    title="Repository-scoped by construction"
+    targetId="recovery-inbox"
+    placement="bottom"
+  >
+    The operator launches the console with one trusted repository. Browser input never chooses an arbitrary filesystem path.
+  </Annotation>
+
+  <Annotation
+    id="brief-boundary"
+    title="Truth stays separated"
+    targetId="recovery-brief"
+    placement="bottom"
+  >
+    Recorded attempts, matching results, and present Git differences remain separate claims; missing evidence becomes uncertainty.
+  </Annotation>
+
+  <Annotation
+    id="receipt-boundary"
+    title="A receipt is an observation, not a test claim"
+    targetId="recovery-receipt"
+    placement="bottom"
+  >
+    The CLI records one explicit owner-supplied process outcome and invalidates its current badge when repository content drifts. The owner label remains annotation.
+  </Annotation>
+
+  <Connector from="recovery-inbox" to="recovery-brief" label="Select session" />
+  <Connector from="recovery-brief" to="receipt-missing" label="Inspect handoff status" />
+  <Connector from="receipt-missing" to="recovery-receipt" label="Refresh latest receipt" />
+</DesignBoard>

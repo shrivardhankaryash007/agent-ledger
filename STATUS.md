@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-18 (Verified Recovery Console implemented and browser-verified; final publication assets pending)
+Last updated: 2026-07-18 (Recovery Loop v1 plan verified and awaiting owner approval; no source implementation started)
 
 ## Current Baseline
 
@@ -20,6 +20,13 @@ Last updated: 2026-07-18 (Verified Recovery Console implemented and browser-veri
   fixed and read-only, unsafe paths fail closed, and the localhost console is
   protected by capability token, Host/Origin allowlists, no CORS, no-store,
   and restrictive CSP.
+- **Recovery Loop v1 is planned, not implemented** (2026-07-18):
+  `plans/recovery-loop-v1/` defines a repository-bound Claude Code + Codex
+  Recovery Inbox, safe absolute-path reconciliation, content-sensitive command
+  receipts, and a canonical recovery package. The plan, wireframes, and
+  prototype pass the local Agent-Native schema/bridge checks. A skeptical
+  review's false-green findings were incorporated; source changes remain paused
+  at the approval gate.
 
 ## Verification
 
@@ -58,23 +65,15 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
 - Claude Code commonly records absolute file paths. `RecoveryBrief` v1 rejects
-  them by design; a future adapter revision needs an explicitly reviewed
-  normalization policy before real-session path comparison becomes convenient.
+  them by design; Recovery Loop v1 now has a reviewed containment policy, but
+  that policy is not implemented yet.
 - Only `claude-code-jsonl@1` is implemented. Codex and Gemini adapters remain
-  deferred until after the competition submission.
+  absent. Recovery Loop v1 scopes Codex next; Gemini remains deferred.
 
 ## Next Useful Work
 
-- Record the public under-three-minute YouTube demo using
-  `agent-ledger demo`, then review the Devpost preview. Submit only after
-  explicit owner confirmation.
-- **M3.b — Packet generator + render is built and verified (2026-07-14):**
-  deterministic extraction and `HANDOFF-CONTRACT.md` rendering are available
-  through `agent-ledger resume [--session ID] [--project NAME] [--out PATH]`;
-  malformed JSONL is skipped and counted, and no cloud calls are made.
-- **M3.c — Dogfood + optional local enrichment (14-day passive window):**
-  owner-paced and explicitly not started by the M3.b build; optional `--llm`
-  remains a separate local-ollama-only scope.
-- **Attribution rescope #2 is demoted** to a gated precondition of the
-  routing/cost surfaces only.
-- M2.5 (route Penny's LLM calls through the litellm capture point) stays parallel and non-blocking.
+- Review and approve `plans/recovery-loop-v1/`; after approval, implement Packet
+  1 by writing the failing Codex call-pairing, repository-binding, and absolute
+  path-containment tests before source changes. The public demo video, M3.c
+  passive dogfood, attribution rescope, and Penny capture integration remain
+  deferred behind this explicit approval gate.

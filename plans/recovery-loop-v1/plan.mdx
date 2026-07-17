@@ -1,0 +1,348 @@
+---
+title: "Agent Ledger Recovery Loop v1"
+brief: "Turn the evidence-linked recovery brief into a local cross-agent inbox, command receipt, and portable handoff workflow."
+kind: "plan"
+localOnly: true
+---
+
+# Recommendation
+
+Build one closed recovery loop, not a broader agent dashboard. An operator starts Agent Ledger against a repository they explicitly trust, sees recent Claude Code and Codex sessions, opens an interrupted session, reconciles recorded activity with current Git truth, attaches a receipt from an explicit owner-selected verification command, and exports one portable handoff package.
+
+The slice is complete when the current real Codex session can be discovered without exposing raw transcript content, its unmatched tool call is shown as unknown, repository-contained absolute paths reconcile safely, an explicit owner-supplied command produces a freshness-aware process receipt, and the browser downloads a canonical package containing the brief, safe prompt, receipt, and checksum manifest.
+
+<Callout id="scope-cut" tone="decision">
+This is Recovery Loop v1. It deliberately closes one end-to-end job—discover, inspect, verify, hand off—before adding background monitoring, cloud sync, agent orchestration, or another provider. The frozen `src/agent_ledger/ledger/` package remains untouched.
+</Callout>
+
+## Product contract
+
+The operator flow is:
+
+1. Run `agent-ledger console --repo PATH`. The CLI resolves one canonical trusted Git root before the server starts.
+2. The Recovery Inbox discovers bounded recent candidates from configured Claude Code and Codex roots. A candidate appears only when its adapter-provided working-directory evidence canonically resolves to the same Git root as the trusted repository; unbound or mismatched sessions are excluded from the console and reported only as aggregate exclusion counts.
+3. Selecting a candidate invokes its declared adapter, assembles `RecoveryBrief` v1 against the trusted repository, and shows recorded facts, present Git facts, and unknowns as separate claims.
+4. If a current command receipt is missing, stale, failed, or timed out, the UI explains the exact local CLI invocation shape. Only a command explicitly supplied by the owner after `--` may run; `shell=False`, the trusted repository is the working directory, and transcript commands are never inputs.
+5. Every process attempt produces `RecoveryReceipt` v1. The UI says only what was observed—such as “command exited 0”—and calls the receipt current only while the content-sensitive repository fingerprint and selected brief digest still match.
+6. A single download returns `RecoveryPackage` v1: canonical brief, guarded prompt, latest receipt with applicability, and component checksums. Export remains available in unknown/failed/stale states and carries that status unmistakably.
+
+<Diagram
+  id="recovery-loop-boundaries"
+  data={{
+    html: `<div class="diagram-panel" style="display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:14px">
+  <section class="diagram-card" data-rough>
+    <strong>UNTRUSTED RECORD</strong>
+    <div class="diagram-node">Claude Code JSONL</div>
+    <div class="diagram-node">Codex rollout JSONL</div>
+    <div class="diagram-pill">calls · results · touched paths</div>
+  </section>
+  <section class="diagram-card" data-rough>
+    <strong>LOCAL TRUST CORE</strong>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="diagram-box">Adapter protocol</div>
+      <div class="diagram-box">Repository containment</div>
+      <div class="diagram-box">Brief assembler</div>
+      <div class="diagram-box">Receipt freshness</div>
+    </div>
+    <div class="diagram-pill">fixed read-only Git calls</div>
+  </section>
+  <section class="diagram-card" data-rough>
+    <strong>OWNER-CONTROLLED OUTPUT</strong>
+    <div class="diagram-node">Read-only recovery UI</div>
+    <div class="diagram-node">Explicit CLI verification</div>
+    <div class="diagram-node">Portable handoff package</div>
+  </section>
+</div>`,
+    css: `.diagram-panel { color: var(--wf-ink); background: var(--wf-paper); }
+.diagram-card { display:flex; flex-direction:column; gap:10px; padding:14px; border:1.4px solid var(--wf-line); background:var(--wf-card); }
+.diagram-node,.diagram-box { padding:10px; border:1.4px solid var(--wf-line); background:var(--wf-paper); }
+.diagram-pill { padding:7px 10px; border:1.4px solid var(--wf-accent); color:var(--wf-accent); }
+.diagram-muted { color:var(--wf-muted); }`,
+  }}
+/>
+
+The browser is deliberately outside the command-execution boundary: all routes remain GET-only. It may display receipts and package artifacts, but it cannot start a subprocess, accept arbitrary filesystem paths, mutate the repository, or manufacture a verification claim.
+
+## Kingfisher transfer
+
+| Transfer | Recovery Loop translation |
+|---|---|
+| Flight recorder | Preserve ordered calls and results, but treat them as a record of attempted activity rather than proof of current state. |
+| Incident command | Present one ranked recovery queue and a bounded next action instead of a general activity feed. |
+| Chain of custody | Give every claim a stable evidence locator and checksum; package records together without embedding raw private content. |
+| Go/no-go gate | A receipt records one explicit process outcome, while a freshness comparison decides whether that observation still applies now. It does not prove what the command semantically tested. |
+
+**Candidate principle:** an interrupted agent session should end with the same three artifacts as a disciplined operational recovery: a reconciled record, a current go/no-go signal, and a handoff whose claims can be independently checked. The transfer is wrong if the inbox becomes a passive history viewer or if a green badge survives repository drift.
+
+## Hard-to-reverse decisions
+
+<Callout id="adapter-contract" tone="decision">
+Provider handling becomes an explicit adapter protocol. `discover()` yields provider-neutral `SessionCandidate` metadata; `extract()` yields normalized `TranscriptEvidence`. Public candidate IDs are `ses-` plus a truncated SHA-256 of provider + source session ID, so URLs never expose provider paths and same-looking IDs cannot collide across providers. The existing Claude extractor is wrapped, not silently generalized; Codex ships as `codex-jsonl@1` with fixtures covering `custom_tool_call`, `custom_tool_call_output`, `function_call`, and `function_call_output` call-ID pairing. Before a candidate enters the repository-scoped catalog, its recorded cwd is resolved to a Git root and must equal the owner-selected root; missing, unreadable, or mismatched cwd evidence excludes it rather than guessing from a project name.
+</Callout>
+
+<Callout id="path-reconciliation" tone="decision">
+Recorded paths may be relative or absolute. An absolute path is accepted only after lexical normalization and canonical resolution prove it is inside the owner-selected repository; it is then converted to a POSIX repository-relative path. Traversal, a leading-dash pathspec, non-POSIX ambiguity, symlink escape, a different worktree, or a nonexistent ancestor that cannot be safely anchored fails closed before Git receives an argument. The selected repository never comes from transcript metadata.
+</Callout>
+
+<Callout id="verification-authority" tone="decision">
+No transcript-derived command executes, and the web app never executes commands. `agent-ledger verify ... -- ARGV` is the only v1 execution door: the owner supplies argv in the current invocation; the CLI resolves argv[0] once, launches that resolved executable with `shell=False`, `stdin=DEVNULL`, the trusted repository as cwd, the owner invocation's inherited environment with `PWD` corrected, and a new process session. On timeout it terminates the process group, waits a bounded grace period, then kills the group. The receipt stores an explicitly untrusted owner label, executable basename and file digest, argument count and canonical argv digest, exit outcome, duration, and repository fingerprints. It stores neither raw arguments, environment, stdout, nor stderr. UI and prompt templates may render the label only as “Owner label”; it can never become a factual verification claim.
+</Callout>
+
+<Callout id="receipt-persistence" tone="decision">
+Receipts are not ledger events and do not change the frozen attribution schema. `RecoveryReceipt` v1 is canonical JSON stored as one private file per receipt under `AGENT_LEDGER_DATA_DIR/recovery-receipts/` (defaulting to the platform user-data directory), written atomically with owner-only permissions. Its content-derived ID and component digests provide checksum consistency, not attacker-resistant attestation. Session discovery is immutable for one server run, transcript extraction is lazy and memoized only after a stable source-file digest check, and current Git state is assembled on each selected-session request. Receipt GETs reread the private store and recompute applicability, so “Refresh receipts” works without a server restart; discovering new sessions still requires restart.
+</Callout>
+
+<Callout id="package-contract" tone="decision">
+`RecoveryPackage` v1 is a single canonical JSON document rather than a ZIP. It embeds the public `RecoveryBrief` and safe continuation prompt, includes the newest receipt attempt for that candidate and brief plus its computed applicability, and carries SHA-256 checksums for each component. Selection never falls back to an older successful attempt: a later failure, error, timeout, or stale attempt governs the handoff state. Package assembly captures one repository fingerprint, assembles all components, then captures it again; drift returns a retryable conflict instead of a mixed-state package. Absolute transcript paths, raw transcript excerpts, raw command argv, command output, environment, capability tokens, and receipt-store paths are prohibited by validation and golden privacy tests.
+</Callout>
+
+<Callout id="prompt-boundary" tone="decision">
+The continuation prompt has two structurally separate regions: application-authored continuation actions and a length-bounded quoted evidence appendix. Intent, labels, tool names, paths, and transcript statements are untrusted strings; the renderer escapes its sentinels, prefixes every data line, and never interpolates them into imperative templates. Hostile fixtures containing role markers, fake delimiters, shell commands, Markdown links, and “ignore previous instructions” text must remain quoted evidence and produce byte-identical action sections.
+</Callout>
+
+<Callout id="repository-fingerprint" tone="decision">
+Receipt freshness uses a content-sensitive `RepositoryFingerprint`, not `git status` text. Its canonical digest covers HEAD; `git diff --cached --binary --no-ext-diff`; `git diff --binary --no-ext-diff`; and a sorted manifest of every untracked, non-ignored path with file type, mode, size, and streamed content digest. Symlinks hash their link target without dereferencing; special files, containment failures, Git errors, or configured byte/time limits yield `snapshot_unavailable` and can never produce a current receipt. This detects content drift even when porcelain status stays unchanged.
+</Callout>
+
+## Data contracts
+
+<DataModel
+  id="recovery-loop-model"
+  entities={[
+    {id: "session-candidate", name: "SessionCandidate", fields: [{name: "candidate_id", type: "str"}, {name: "provider", type: "str"}, {name: "source_adapter", type: "SourceAdapter"}, {name: "source_session_id", type: "str"}, {name: "project_hint", type: "str"}, {name: "started_at", type: "datetime"}, {name: "updated_at", type: "datetime"}, {name: "ending", type: "completed | interrupted | active | unknown"}, {name: "unmatched_call_count", type: "int"}]},
+    {id: "transcript-evidence", name: "TranscriptEvidence", fields: [{name: "session_id", type: "str"}, {name: "intent", type: "str"}, {name: "ending", type: "str"}, {name: "attempts", type: "tuple[ToolAttempt, ...]"}, {name: "recorded_paths", type: "tuple[str, ...]"}, {name: "evidence", type: "tuple[EvidenceRef, ...]"}]},
+    {id: "recovery-brief", name: "RecoveryBrief v1", fields: [{name: "session_id", type: "str"}, {name: "source_adapter", type: "SourceAdapter"}, {name: "observations", type: "tuple[Observation, ...]"}, {name: "uncertainties", type: "tuple[Uncertainty, ...]"}, {name: "readiness", type: "tuple[ReadinessCheck, ...]"}, {name: "actions", type: "tuple[ContinuationAction, ...]"}, {name: "evidence", type: "tuple[EvidenceRef, ...]"}]},
+    {id: "recovery-receipt", name: "RecoveryReceipt v1", fields: [{name: "receipt_id", type: "str"}, {name: "brief_digest", type: "sha256"}, {name: "candidate_id", type: "str"}, {name: "owner_label", type: "untrusted str"}, {name: "executable", type: "basename"}, {name: "executable_digest", type: "sha256"}, {name: "argv_digest", type: "sha256"}, {name: "argument_count", type: "int"}, {name: "outcome", type: "exited_zero | exited_nonzero | error | timeout"}, {name: "exit_code", type: "int | None", nullable: true}, {name: "duration_ms", type: "int"}, {name: "repository_before", type: "RepositoryFingerprint"}, {name: "repository_after", type: "RepositoryFingerprint"}, {name: "completed_at", type: "datetime"}]},
+    {id: "recovery-package", name: "RecoveryPackage v1", fields: [{name: "package_version", type: "int"}, {name: "exported_at", type: "datetime"}, {name: "handoff_status", type: "current_exit_zero | failed | timeout | error | stale | missing"}, {name: "brief", type: "RecoveryBrief"}, {name: "prompt", type: "str"}, {name: "latest_receipt", type: "RecoveryReceipt | None", nullable: true}, {name: "receipt_applicability", type: "current | stale | missing"}, {name: "component_checksums", type: "dict[str, sha256]"}]},
+  ]}
+  relations={[
+    {from: "session-candidate", to: "transcript-evidence", kind: "1-1", label: "adapter extracts"},
+    {from: "transcript-evidence", to: "recovery-brief", kind: "1-1", label: "reconciled with Git"},
+    {from: "recovery-brief", to: "recovery-receipt", kind: "1-n", label: "may have command attempts"},
+    {from: "recovery-brief", to: "recovery-package", kind: "1-1", label: "exports"},
+    {from: "recovery-receipt", to: "recovery-package", kind: "0-1", label: "attached when current"},
+  ]}
+/>
+
+Receipt freshness is evaluated, not stored as eternal truth:
+
+```text
+current = receipt.repository_after.digest == current_repository.digest
+       && receipt.brief_digest == selected_brief.digest
+```
+
+An exited-zero but stale receipt remains visible as historical evidence and never grants a current state. The latest attempt governs: a later nonzero exit, error, or timeout cannot be hidden by an older exited-zero receipt. The package is always a recovery package, never an independently reproducible attestation; its argv checksum can confirm equality only when the recipient already possesses the command.
+
+## API and CLI contracts
+
+<Endpoint
+  id="sessions-endpoint"
+  method="GET"
+  path="/api/sessions"
+  summary="Return the bounded, privacy-redacted session candidates discovered at startup for the trusted repository."
+/>
+
+<Endpoint
+  id="recovery-endpoint"
+  method="GET"
+  path="/api/sessions/{candidate_id}/recovery"
+  summary="Return the selected canonical RecoveryBrief v1; unknown candidates return 404 and no path parameter is accepted."
+/>
+
+<Endpoint
+  id="prompt-endpoint"
+  method="GET"
+  path="/api/sessions/{candidate_id}/prompt"
+  summary="Return the deterministic application-authored continuation prompt for the selected brief."
+/>
+
+<Endpoint
+  id="receipt-endpoint"
+  method="GET"
+  path="/api/sessions/{candidate_id}/receipt"
+  summary="Reread the receipt store and return the latest attempt plus server-computed current/stale applicability; never fall back to an older success."
+/>
+
+<Endpoint
+  id="package-endpoint"
+  method="GET"
+  path="/api/sessions/{candidate_id}/package"
+  summary="Download canonical RecoveryPackage v1 JSON in current, failed, timeout, error, stale, or missing status."
+/>
+
+All endpoints retain the existing ephemeral capability token, strict Host and Origin checks, no CORS, `Cache-Control: no-store`, local assets, and CSP. `/api/recovery` and `/api/prompt` remain temporary compatibility aliases only when the console was started with one explicit `--session`; the inbox mode uses the candidate-scoped routes.
+
+CLI surface:
+
+```text
+agent-ledger sessions --repo PATH [--provider claude-code|codex]
+agent-ledger recover --session CANDIDATE_ID --repo PATH --format json|prompt
+agent-ledger console --repo PATH [--session CANDIDATE_ID] [--no-open]
+agent-ledger verify --session CANDIDATE_ID --repo PATH --label OWNER_NOTE --timeout SECONDS -- ARGV...
+agent-ledger package --session CANDIDATE_ID --repo PATH --output FILE
+agent-ledger demo [--no-open] [--smoke]
+```
+
+`sessions`, `recover`, `console`, and `package` are read-only. `verify` may run exactly the explicit argv supplied after `--`; it does not edit repository files itself, but the selected command may do so, so the CLI captures repository state both before and after and documents that authority clearly. The owner note is never treated as a description of what the command established.
+
+## Implementation packets
+
+### Packet 1 — adapter seam, Codex evidence, and safe paths
+
+- Introduce the provider-neutral adapter protocol and move Claude-specific discovery behind it without changing `ResumePacket` v1 output.
+- Parse Codex envelopes structurally: session metadata for identity/cwd, `custom_tool_call` ↔ `custom_tool_call_output`, and `function_call` ↔ `function_call_output` by call ID. `status: completed` on a call is not a successful tool result.
+- Discover a bounded newest-first set with configurable roots and injected clocks/filesystems for deterministic tests.
+- Require canonical candidate-to-repository binding before catalog inclusion; mismatched and unbound sessions never assemble against the selected repository.
+- Expand path reconciliation to safely normalize repository-contained absolute paths.
+- Dogfood against the current Codex rollout using structure-only assertions; never commit or echo its raw content.
+
+Acceptance gate: a sanitized Codex fixture with one unmatched custom call produces `unknown`; a matched result produces the conservative result state; the current rollout is discovered by ID; absolute-in-repo paths normalize; every escape case fails before Git argv; and an agent-ledger candidate is excluded from a recovery-demo console even when its project label looks plausible.
+
+### Packet 2 — Recovery Inbox and selected-session console
+
+- Change `create_app` from one brief to a catalog with immutable startup candidates and internal source locators. Parse transcript evidence lazily after verifying a stable source digest, assemble fresh Git evidence on each selected-session request, and reread receipts on each receipt/package request; expose no rescan or mutation endpoint.
+- Preserve the present graphite/warm-paper flight-recorder shell, serif display hierarchy, evidence register, keyboard behavior, and narrow layout. Add an inbox state, provider/readiness filters, selected-session navigation, empty/error states, and a non-JavaScript fallback message.
+- Keep rendering text-only through DOM `textContent`; no transcript HTML, external fonts, framework, analytics, or cloud requests.
+
+Acceptance gate: the exact canvas flow works at 1440px and 390px; keyboard-only selection, back navigation, focus restoration, filter state, and status announcements work; existing one-session API tests stay green through compatibility mode.
+
+### Packet 3 — receipt and package
+
+- Add content-sensitive repository fingerprints over HEAD, staged diff, tracked worktree diff, and untracked content; snapshot inability is an explicit non-current state.
+- Add explicit verification process execution, process-group timeout/error handling, before/after fingerprints, receipt validation, atomic private persistence, and freshness evaluation.
+- Add canonical package assembly and download headers; select the latest attempt regardless of outcome, retain all local receipt files, and reject concurrent repository drift during assembly.
+- Add missing, stale, nonzero, error, and timeout receipt states before the current-exited-zero state so the UI cannot imply a stronger claim than the process result.
+
+Acceptance gate: exit-zero, nonzero, timeout with descendant process, executable-not-found, HEAD drift, same-status tracked-content drift, staged-content drift, untracked-content drift, pass-then-fail precedence, checksum mismatch, recomputed checksum limitation, interrupted atomic write, malicious owner labels, and private-file-permission tests all behave deterministically; no output, raw argv, or environment leaks into receipt, package, API, prompt, or logs.
+
+### Packet 4 — credible demo and handoff
+
+- Extend the synthetic demo with both Claude and Codex fixtures, Inbox → Brief → Missing Receipt → Current Receipt states, and a safe cross-platform verification helper owned by the package rather than a recovered command.
+- Add a headless smoke path that starts the server, fetches every protected route, creates a receipt through the CLI execution path, checks freshness, downloads the package, stops, and removes the disposable repository and receipt data directory.
+- Update architecture, ADR, README, status, and session evidence. Preserve the existing public BuildWeek evidence boundary and clearly distinguish synthetic demo proof from real local dogfood proof.
+
+Acceptance gate: a built wheel completes the full smoke path from a disposable directory; the real current Codex session produces the same unmatched-call truth signal without any private artifact entering Git.
+
+## Files in scope
+
+<FileTree
+  id="recovery-loop-files"
+  entries={[
+    {path: "src/agent_ledger/recovery/adapters/base.py", change: "added", note: "Provider-neutral discovery/extraction protocol and normalized transcript-evidence types."},
+    {path: "src/agent_ledger/recovery/adapters/claude_code.py", change: "added", note: "Declared wrapper around the existing Claude JSONL evidence logic."},
+    {path: "src/agent_ledger/recovery/adapters/codex.py", change: "added", note: "Codex envelope and call-ID pairing adapter, versioned independently."},
+    {path: "src/agent_ledger/recovery/discovery.py", change: "added", note: "Bounded multi-provider session discovery and privacy-redacted candidate IDs."},
+    {path: "src/agent_ledger/recovery/models.py", change: "modified", note: "SessionCandidate, receipt, package, outcome, and applicability contracts without changing RecoveryBrief v1."},
+    {path: "src/agent_ledger/recovery/git_state.py", change: "modified", note: "Safe absolute-path containment and content-sensitive repository fingerprint."},
+    {path: "src/agent_ledger/recovery/assembler.py", change: "modified", note: "Consume normalized TranscriptEvidence rather than a Claude-specific parser."},
+    {path: "src/agent_ledger/recovery/receipts.py", change: "added", note: "Explicit verification runner, private atomic store, and freshness evaluation."},
+    {path: "src/agent_ledger/recovery/package.py", change: "added", note: "Canonical recovery package, checksum manifest, latest-attempt precedence, and concurrent-drift guard."},
+    {path: "src/agent_ledger/resume/evidence.py", change: "modified", note: "Retain backward-compatible Claude helpers while delegating recovery extraction through the adapter."},
+    {path: "src/agent_ledger/api/app.py", change: "modified", note: "Immutable recovery catalog and candidate-scoped GET routes; no execution endpoint."},
+    {path: "src/agent_ledger/api/static/index.html", change: "modified", note: "Recovery Inbox, selected brief, receipt, and package shells."},
+    {path: "src/agent_ledger/api/static/app.js", change: "modified", note: "Accessible client-side state/navigation over capability-protected read-only APIs."},
+    {path: "src/agent_ledger/api/static/app.css", change: "modified", note: "Extend the existing industrial editorial system across inbox and receipt states."},
+    {path: "src/agent_ledger/cli.py", change: "modified", note: "Provider selection, inbox console, explicit verify, and package commands."},
+    {path: "src/agent_ledger/demo/scenario.py", change: "modified", note: "Multi-provider closed-loop synthetic scenario and smoke cleanup."},
+    {path: "src/agent_ledger/demo/fixture/codex-session.jsonl", change: "added", note: "Sanitized interrupted Codex envelope fixture with no private content."},
+    {path: "tests/test_recovery_adapters.py", change: "added", note: "Provider fixtures, call pairing, discovery limits, privacy, and malformed JSONL properties."},
+    {path: "tests/test_recovery.py", change: "modified", note: "Normalized evidence assembly and safe absolute-path reconciliation."},
+    {path: "tests/test_recovery_receipts.py", change: "added", note: "Execution authority, content-sensitive freshness, attempt precedence, persistence, and leakage tests."},
+    {path: "tests/test_api.py", change: "modified", note: "Inbox/catalog endpoints, capability boundary, compatibility mode, and download contract."},
+    {path: "tests/test_demo_install.py", change: "modified", note: "Built-wheel end-to-end closed recovery smoke."},
+    {path: "docs/decisions/0004-recovery-loop-adapters-receipts-and-authority.md", change: "added", note: "Adapter identity, path containment, verification authority, receipt persistence, and package wire-format rationale."},
+    {path: "docs/architecture.md", change: "modified", note: "Recovery Loop boundary and read-only browser / explicit CLI execution split."},
+    {path: "README.md", change: "modified", note: "Inbox, Codex support, receipt/package workflow, privacy claims, and exact judge path."},
+    {path: "STATUS.md", change: "modified", note: "Live packet state, verified commands, known gaps, and next useful work."},
+  ]}
+/>
+
+`src/agent_ledger/ledger/`, ledger schemas, attribution logic, token accounting, and existing migrations are checked but not modified.
+
+## Verification matrix
+
+<Table
+  id="verification-matrix"
+  columns={["Boundary", "Proof", "Failure signal"]}
+  rows={[
+    ["Provider truth", "Golden Claude and Codex fixtures plus unmatched-call structural dogfood", "A call without a matching result appears passed or completed"],
+    ["Repository containment", "Table/property tests over candidate binding plus relative, absolute, traversal, symlink, worktree, and option-like paths", "Any mismatched candidate assembles or unsafe value reaches Git argv"],
+    ["Execution authority", "Mocked exact subprocess argv/cwd/env/stdin/timeout and hostile transcript fixtures", "Transcript text influences an executed argv"],
+    ["Receipt honesty", "Exit-zero/nonzero/error/timeout, pass-then-fail precedence, HEAD/index/tracked/untracked content drift, label-injection, and checksum tests", "A label becomes a claim, an older success masks a later attempt, or same-status content drift stays current"],
+    ["Prompt boundary", "Hostile role markers, delimiter injection, imperative TODOs, shell text, paths, and owner labels", "Untrusted text changes the application-authored action section"],
+    ["Privacy", "Canonical JSON snapshots and credential/home-path/raw-output scanners", "Package, API, receipt, or logs contain prohibited raw material"],
+    ["Local server", "Capability, Host, Origin, CSP, no-store, no-CORS, GET-only route tests", "Browser gains mutation or command execution authority"],
+    ["Product UI", "1440px + 390px screenshots, keyboard path, focus, contrast, reduced motion, error/empty/loading states", "The loop cannot be completed or truth status is ambiguous"],
+    ["Distribution", "Ruff, MyPy strict, PyTest ≥80%, `uv build`, disposable built-wheel smoke", "Demo works only from the source checkout"],
+  ]}
+/>
+
+The focused baseline is the current 62-test suite, which passes before this plan. Implementation begins with failing acceptance tests for Packet 1, and every packet ends with focused tests plus the full project gate before the next packet starts.
+
+## Risks and stop rules
+
+<Callout id="risk-command-runner" tone="risk">
+**Local command-runner expansion:** if convenience pressure introduces a POST execution route, arbitrary browser argv, recovered transcript commands, or shell invocation, stop. That is a new authority model requiring a separate plan and threat review, not a small UX improvement.
+</Callout>
+
+<Callout id="risk-false-green" tone="risk">
+**Receipt theatre:** exit code zero is only a process outcome. The UI must mark the owner label as untrusted annotation, show the executable/argument checksum boundary, compare content-sensitive repository state, and say the package is not independently reproducible without the original argv. If a receipt cannot become stale or its label implies what the command established, stop.
+</Callout>
+
+<Callout id="risk-provider-drift" tone="risk">
+**Provider format drift:** adapters fail closed on unknown event shapes and identify themselves by version. Discovery may still list an unreadable session with an adapter-error status, but extraction never guesses across providers or treats a call's `completed` status as a tool result.
+</Callout>
+
+<Callout id="risk-inbox-noise" tone="risk">
+**History feed drift:** the Inbox is for recovery decisions, not surveillance or productivity analytics. Cap the list, rank interrupted/unknown sessions first, show only metadata required to choose, and omit message previews, token counts, cost, agent reasoning, and background notifications.
+</Callout>
+
+<Callout id="risk-scope" tone="risk">
+**Overbuilding:** do not begin another provider, a daemon, cloud sync, account auth, session lineage graph, automatic LLM summary, remote collaboration, or ledger integration until the current Codex dogfood path produces a truthful closed-loop package from the installed wheel.
+</Callout>
+
+## Explicitly deferred
+
+<Table
+  id="deferred-scope"
+  columns={["Deferred", "Why"]}
+  rows={[
+    ["Gemini, Cursor, OpenCode, and generic heuristic adapters", "Each format requires inspected evidence shapes and its own conservative adapter fixtures."],
+    ["Web-triggered verification", "Would make the capability URL a command-execution surface and materially expand the threat model."],
+    ["Recovered or suggested command execution", "Transcript commands are untrusted evidence; project-specific defaults would be easy to overclaim."],
+    ["Background watcher, daemon, notifications, and live filesystem refresh", "Adds lifecycle and mutable-state complexity before on-demand recovery is proven."],
+    ["Cloud sync, accounts, shared dashboards, analytics, or transcript upload", "Breaks the local-first wedge and adds no proof to the recovery contract."],
+    ["Receipt signing or external attestation", "Checksums and private local storage support consistency checks only; identity-grade attestation needs a separate key-management design."],
+    ["LLM summarization", "The product differentiator is deterministic reconciliation and explicit uncertainty, not generic transcript summary."],
+    ["Frozen ledger and attribution rescope", "Existing kill criteria and schema boundaries are unrelated to closing the recovery loop."],
+  ]}
+/>
+
+## Skills applied
+
+- `kingfisher-move` translated flight-recorder, incident-command, chain-of-custody, and go/no-go mechanisms into falsifiable product requirements without importing operational ceremony.
+- `frontend-system` set the UI acceptance and proof sequence before source work.
+- `frontend-design` preserved the existing industrial/editorial recovery identity rather than replacing it with a generic dashboard.
+- `visual-plan` produced the static product states and aligned click-through prototype in local-files privacy mode.
+
+<Checklist
+  id="implementation-gates"
+  items={[
+    {id: "gate-1", label: "Packet 1 failing tests prove Codex call pairing and safe absolute-path containment before implementation"},
+    {id: "gate-2", label: "Current Codex rollout is discovered and assessed structurally without raw private content entering source control"},
+    {id: "gate-3", label: "Recovery Inbox and selected brief match the approved canvas at desktop and narrow widths"},
+    {id: "gate-4", label: "Command execution is owner-supplied, shell-free, process-group bounded, and unreachable from the browser"},
+    {id: "gate-5", label: "Latest-attempt receipts become stale on HEAD, index, tracked, untracked, or brief drift and never retain raw argv, environment, or output"},
+    {id: "gate-6", label: "Canonical package passes checksum, prompt-injection, privacy, compatibility, concurrent-drift, and capability-boundary tests"},
+    {id: "gate-7", label: "Built-wheel demo completes Inbox → Brief → Receipt → Package and cleans every disposable artifact"},
+    {id: "gate-8", label: "Ruff, MyPy strict, PyTest with coverage, build, UI audit, docs, ADR, STATUS, and session handoff are green"},
+  ]}
+/>
+
+<QuestionForm
+  id="approval"
+  questions={[
+    {id: "approve_recovery_loop", title: "Approve Recovery Loop v1 for implementation?", mode: "single", options: [{id: "approve", label: "Approve the full loop", detail: "Implement the four packets in order, preserving the read-only browser and explicit CLI verification boundary.", recommended: true}, {id: "revise", label: "Revise the plan", detail: "Keep source changes paused and adjust scope or a hard-to-reverse decision first."}]},
+  ]}
+  submitLabel="Record decision"
+/>
