@@ -28,7 +28,12 @@ from agent_ledger.recovery.assembler import recover_session
 from agent_ledger.recovery.catalog import RecoveryCatalog
 from agent_ledger.recovery.discovery import AdapterRoot, discover_sessions
 from agent_ledger.recovery.git_state import resolve_repo
+from agent_ledger.recovery.package import (
+    assemble_recovery_package,
+    recovery_brief_digest,
+)
 from agent_ledger.recovery.prompt import render_recovery_prompt
+from agent_ledger.recovery.receipts import ReceiptStore, run_verification
 from agent_ledger.report.spend import per_project
 from agent_ledger.resume.detector import detect_ending
 from agent_ledger.resume.extractor import extract_packet
@@ -76,6 +81,27 @@ def _recovery_roots() -> tuple[AdapterRoot, ...]:
     )
 
 
+def _receipt_store() -> ReceiptStore:
+    configured = os.environ.get("AGENT_LEDGER_DATA_DIR")
+    data_root = (
+        Path(configured).expanduser()
+        if configured is not None
+        else Path("~/.local/share/agent-ledger").expanduser()
+    )
+    return ReceiptStore(data_root / "recovery-receipts")
+
+
+def _recovery_catalog(repo: Path) -> RecoveryCatalog:
+    trusted_repo = resolve_repo(repo)
+    roots = _recovery_roots()
+    discovery = discover_sessions(repo=trusted_repo, roots=roots)
+    return RecoveryCatalog(
+        repo=trusted_repo,
+        discovery=discovery,
+        adapters=tuple(root.adapter for root in roots),
+    )
+
+
 def _find_transcript(session: str) -> Path:
     projects_dir = _projects_dir()
     if not projects_dir.is_dir():
@@ -119,6 +145,7 @@ def _serve_inbox(
     token = secrets.token_urlsafe(24)
     console_app = create_app(
         catalog=catalog,
+        receipt_store=_receipt_store(),
         capability_token=token,
         port=port,
     )
@@ -385,18 +412,73 @@ def console(
     """Open the repository-bound local Recovery Inbox."""
 
     try:
-        trusted_repo = resolve_repo(repo)
-        roots = _recovery_roots()
-        discovery = discover_sessions(repo=trusted_repo, roots=roots)
-        catalog = RecoveryCatalog(
-            repo=trusted_repo,
-            discovery=discovery,
-            adapters=tuple(root.adapter for root in roots),
-        )
+        catalog = _recovery_catalog(repo)
     except (OSError, ValueError, RuntimeError) as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(1) from exc
     _serve_inbox(catalog, port=port, open_browser=not no_open)
+
+
+@app.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+def verify(
+    context: typer.Context,
+    session: str = typer.Option(..., "--session", help="Opaque candidate ID."),
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Trusted Git repository."),
+    label: str = typer.Option(..., "--label", help="Untrusted owner annotation."),
+    timeout: float = typer.Option(
+        300.0,
+        "--timeout",
+        min=0.1,
+        max=3600,
+        help="Maximum process duration in seconds.",
+    ),
+) -> None:
+    """Record one explicit owner-supplied process attempt after ``--``."""
+
+    argv = tuple(context.args)
+    if argv and argv[0] == "--":
+        argv = argv[1:]
+    try:
+        catalog = _recovery_catalog(repo)
+        brief = catalog.recover(session)
+        receipt = run_verification(
+            repo=catalog.trusted_repo,
+            candidate_id=session,
+            brief_digest=recovery_brief_digest(brief),
+            owner_label=label,
+            argv=argv,
+            timeout_seconds=timeout,
+        )
+        path = _receipt_store().save(receipt)
+    except (OSError, ValueError, RuntimeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(receipt.model_dump_json(indent=2))
+    typer.echo(f"Stored private receipt: {path.name}")
+
+
+@app.command("package")
+def package_command(
+    session: str = typer.Option(..., "--session", help="Opaque candidate ID."),
+    repo: Path = typer.Option(Path.cwd(), "--repo", help="Trusted Git repository."),
+    output: Path = typer.Option(..., "--output", help="Recovery package JSON path."),
+) -> None:
+    """Export a canonical read-only recovery package."""
+
+    try:
+        catalog = _recovery_catalog(repo)
+        package = assemble_recovery_package(
+            catalog=catalog,
+            candidate_id=session,
+            store=_receipt_store(),
+        )
+        output.write_text(package.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    except (OSError, ValueError, RuntimeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"Wrote recovery package: {output}")
 
 
 @app.command()

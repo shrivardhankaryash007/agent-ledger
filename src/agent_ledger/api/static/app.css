@@ -550,6 +550,24 @@ h2 {
   background: #d7c8ab;
 }
 
+.receipt-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(2rem, 7vw, 7rem);
+  padding: clamp(3rem, 6vw, 6rem) clamp(1.25rem, 4vw, 4.5rem);
+  border-top: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.receipt-section > div:first-child > p:last-child { color: var(--ink-soft); line-height: 1.5; }
+.receipt-card { display: grid; gap: 1rem; padding: 1.25rem; border: 1px solid var(--line); background: var(--white); }
+.receipt-card h3 { margin: 0; font: 500 1.7rem var(--serif); }
+.receipt-card p { margin: 0; color: var(--ink-soft); line-height: 1.45; }
+.receipt-card code { padding: 1rem; overflow-wrap: anywhere; border: 1px solid var(--line); background: var(--paper); font: 0.72rem/1.5 var(--mono); }
+.receipt-section[data-applicability="current"] .receipt-card { box-shadow: inset 6px 0 var(--green); }
+.receipt-section[data-applicability="stale"] .receipt-card { box-shadow: inset 6px 0 var(--amber); }
+.download-button { display: grid; place-items: center; text-decoration: none; }
+
 .prompt-section p { max-width: 650px; margin-bottom: 0; color: var(--ink-soft); }
 .copy-button {
   min-height: 52px;
@@ -585,6 +603,7 @@ footer { color: #aaa59b; }
 
 @media (max-width: 900px) {
   .inbox-hero,
+  .receipt-section,
   .hero-grid,
   .comparison,
   .handoff-section { grid-template-columns: 1fr; }

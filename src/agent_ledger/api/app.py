@@ -18,7 +18,13 @@ from agent_ledger.recovery.git_state import (
     RecoveryGitError,
     UnsafeRecoveryPathError,
 )
+from agent_ledger.recovery.package import (
+    ConcurrentRepositoryDriftError,
+    assemble_recovery_package,
+    receipt_status,
+)
 from agent_ledger.recovery.prompt import render_recovery_prompt
+from agent_ledger.recovery.receipts import ReceiptIntegrityError, ReceiptStore
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -63,6 +69,7 @@ def create_app(
     brief: RecoveryBrief | None = None,
     prompt: str | None = None,
     catalog: RecoveryCatalog | None = None,
+    receipt_store: ReceiptStore | None = None,
     allowed_hosts: frozenset[str] | None = None,
     allowed_origins: frozenset[str] | None = None,
     port: int = 8680,
@@ -73,6 +80,7 @@ def create_app(
         brief: Optional immutable recovery data for single-session compatibility.
         prompt: Safe prompt paired with ``brief`` in compatibility mode.
         catalog: Optional repository-bound session catalog for Inbox mode.
+        receipt_store: Optional private store enabling read-only receipt/package routes.
         capability_token: Unguessable token required for every resource.
         allowed_hosts: Optional exact Host allowlist, primarily for tests.
         allowed_origins: Optional exact Origin allowlist, primarily for tests.
@@ -196,5 +204,51 @@ def create_app(
             if isinstance(selected, Response):
                 return selected
             return JSONResponse({"prompt": render_recovery_prompt(selected)})
+
+        if receipt_store is not None:
+
+            @app.get("/api/sessions/{candidate_id}/receipt")
+            async def catalog_receipt(candidate_id: str) -> Response:
+                selected = selected_recovery(candidate_id)
+                if isinstance(selected, Response):
+                    return selected
+                try:
+                    status = receipt_status(
+                        catalog=catalog,
+                        candidate_id=candidate_id,
+                        store=receipt_store,
+                    )
+                except ReceiptIntegrityError:
+                    return JSONResponse(
+                        {"detail": "stored receipt failed integrity validation"},
+                        status_code=409,
+                    )
+                return JSONResponse(status.model_dump(mode="json"))
+
+            @app.get("/api/sessions/{candidate_id}/package")
+            async def catalog_package(candidate_id: str) -> Response:
+                selected = selected_recovery(candidate_id)
+                if isinstance(selected, Response):
+                    return selected
+                try:
+                    package = assemble_recovery_package(
+                        catalog=catalog,
+                        candidate_id=candidate_id,
+                        store=receipt_store,
+                    )
+                except (ConcurrentRepositoryDriftError, ReceiptIntegrityError):
+                    return JSONResponse(
+                        {"detail": "recovery package changed during assembly"},
+                        status_code=409,
+                    )
+                return Response(
+                    package.model_dump_json(indent=2),
+                    media_type="application/json",
+                    headers={
+                        "Content-Disposition": (
+                            f'attachment; filename="recovery-{candidate_id}.json"'
+                        )
+                    },
+                )
 
     return app

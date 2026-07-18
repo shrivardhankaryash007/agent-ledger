@@ -259,6 +259,8 @@ Acceptance gate: the exact canvas flow works at 1440px and 390px; keyboard-only 
 
 Acceptance gate: exit-zero, nonzero, timeout with descendant process, executable-not-found, HEAD drift, same-status tracked-content drift, staged-content drift, untracked-content drift, pass-then-fail precedence, checksum mismatch, recomputed checksum limitation, interrupted atomic write, malicious owner labels, and private-file-permission tests all behave deterministically; no output, raw argv, or environment leaks into receipt, package, API, prompt, or logs.
 
+**Implementation checkpoint (2026-07-18):** content-sensitive fingerprints, shell-free bounded execution, exit-zero/nonzero/timeout/error outcomes, owner-only atomic storage, latest-attempt precedence, applicability, canonical package checksums, CLI verify/package commands, read-only API routes, and the receipt UI state are implemented. The full project gate passes; descendant-process, interrupted-write, and concurrent-drift fault-injection cases remain to be expanded in Packet 4 before the final gate.
+
 ### Packet 4 — credible demo and handoff
 
 - Extend the synthetic demo with both Claude and Codex fixtures, Inbox → Brief → Missing Receipt → Current Receipt states, and a safe cross-platform verification helper owned by the package rather than a recovered command.

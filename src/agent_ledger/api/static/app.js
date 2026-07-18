@@ -220,8 +220,32 @@ function showInbox({ restoreFocus = true } = {}) {
   if (restoreFocus && state.selectedButton?.isConnected) state.selectedButton.focus();
 }
 
-function showBrief(brief, promptPayload, provider) {
+function renderReceipt(status, candidateId) {
+  const applicability = status.applicability.toUpperCase();
+  const receipt = status.latest_receipt;
+  document.querySelector("#receipt-applicability").textContent = applicability;
+  document.querySelector("#receipt-section").dataset.applicability = status.applicability;
+  if (receipt) {
+    document.querySelector("#receipt-title").textContent = "Latest process attempt.";
+    document.querySelector("#receipt-outcome").textContent = receipt.outcome.replaceAll("_", " ").toUpperCase();
+    document.querySelector("#receipt-summary").textContent = "An observed process outcome, not a claim about what the command proved.";
+    document.querySelector("#receipt-detail").textContent = `${receipt.executable} · ${receipt.argument_count} arguments · owner label: ${receipt.owner_label}`;
+  } else {
+    document.querySelector("#receipt-title").textContent = "One honest step remains.";
+    document.querySelector("#receipt-outcome").textContent = "NO CURRENT COMMAND RECEIPT";
+    document.querySelector("#receipt-summary").textContent = "Run a command you choose in the trusted repository, then refresh the console.";
+    document.querySelector("#receipt-detail").textContent = "Transcript commands never enter argv, and the browser cannot launch the process.";
+  }
+  document.querySelector("#verify-command").textContent =
+    `agent-ledger verify --session ${candidateId} --repo . --label owner-note -- YOUR COMMAND`;
+  const download = document.querySelector("#download-package");
+  download.href = `/api/sessions/${encodeURIComponent(candidateId)}/package`;
+  download.download = `recovery-${candidateId}.json`;
+}
+
+function showBrief(brief, promptPayload, provider, receiptStatus, candidateId) {
   renderBrief(brief);
+  renderReceipt(receiptStatus, candidateId);
   state.continuationPrompt = promptPayload.prompt;
   document.querySelector("#copy-prompt").disabled = false;
   document.querySelector("#selected-provider").textContent = provider.toUpperCase();
@@ -238,11 +262,12 @@ async function openCandidate(candidateId, trigger, pushHistory) {
   document.querySelector("#inbox-view").hidden = true;
   const candidate = state.candidates.find((item) => item.candidate_id === candidateId);
   try {
-    const [brief, promptPayload] = await Promise.all([
+    const [brief, promptPayload, receiptStatus] = await Promise.all([
       fetchJson(`/api/sessions/${encodeURIComponent(candidateId)}/recovery`),
-      fetchJson(`/api/sessions/${encodeURIComponent(candidateId)}/prompt`)
+      fetchJson(`/api/sessions/${encodeURIComponent(candidateId)}/prompt`),
+      fetchJson(`/api/sessions/${encodeURIComponent(candidateId)}/receipt`)
     ]);
-    showBrief(brief, promptPayload, candidate?.provider || "session");
+    showBrief(brief, promptPayload, candidate?.provider || "session", receiptStatus, candidateId);
     if (pushHistory) {
       window.history.pushState({ view: "brief", candidateId }, "", `#session=${encodeURIComponent(candidateId)}`);
     }
@@ -261,7 +286,12 @@ async function loadCompatibility() {
     fetchJson("/api/prompt")
   ]);
   document.querySelector(".brief-toolbar").hidden = true;
-  showBrief(brief, promptPayload, brief.source_adapter.name);
+  document.querySelector("#receipt-section").hidden = true;
+  renderBrief(brief);
+  state.continuationPrompt = promptPayload.prompt;
+  document.querySelector("#copy-prompt").disabled = false;
+  document.querySelector("#console-loading").hidden = true;
+  document.querySelector("#brief-view").hidden = false;
   window.history.replaceState({ view: "compatibility" }, document.title, "/");
 }
 

@@ -24,6 +24,7 @@ from agent_ledger.recovery.models import (
     SourceAdapter,
     Uncertainty,
 )
+from agent_ledger.recovery.receipts import ReceiptStore
 
 
 def _brief() -> RecoveryBrief:
@@ -159,6 +160,7 @@ def _catalog_client(tmp_path: Path) -> tuple[TestClient, Path, str]:
     client = TestClient(
         create_app(
             catalog=catalog,
+            receipt_store=ReceiptStore(tmp_path / "receipts"),
             capability_token="test-token",
             allowed_hosts=frozenset({"testserver"}),
             allowed_origins=frozenset({"http://testserver"}),
@@ -251,6 +253,17 @@ def test_catalog_api_lists_redacted_candidates_and_lazily_assembles_brief(
     assert prompt_response.status_code == 200
     assert "# Verified recovery brief" in prompt_response.json()["prompt"]
     assert "private-command" not in (brief_response.text + prompt_response.text)
+    receipt_response = client.get(
+        f"/api/sessions/{candidate_id}/receipt",
+        headers=headers,
+    )
+    package_response = client.get(
+        f"/api/sessions/{candidate_id}/package",
+        headers=headers,
+    )
+    assert receipt_response.json()["applicability"] == "missing"
+    assert package_response.json()["handoff_status"] == "missing"
+    assert package_response.headers["content-disposition"].startswith("attachment;")
     assert client.get("/api/recovery", headers=headers).status_code == 404
 
 

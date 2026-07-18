@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-2 implemented and verified)
+Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-3 implemented and verified)
 
 ## Current Baseline
 
@@ -20,7 +20,7 @@ Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-2 implemented and verified)
   fixed and read-only, unsafe paths fail closed, and the localhost console is
   protected by capability token, Host/Origin allowlists, no CORS, no-store,
   and restrictive CSP.
-- **Recovery Loop v1 Packets 1-2 are implemented and verified** (2026-07-18,
+- **Recovery Loop v1 Packets 1-3 are implemented and verified** (2026-07-18,
   ADR 0004): the provider-neutral adapter seam supports declared Claude Code
   and Codex JSONL formats, Codex calls pair with outputs only by exact call ID,
   discovery binds candidates to the exact trusted Git root, and contained
@@ -28,7 +28,9 @@ Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-2 implemented and verified)
   enter public evidence models. `agent-ledger console --repo PATH` now opens an
   immutable Recovery Inbox with lazy digest-checked selection, redacted failure
   states, filters, responsive layouts, and compatibility for the original
-  explicit-session console. Packets 3-4 remain to be implemented.
+  explicit-session console. CLI-only verification now produces content-fresh,
+  private receipts and canonical downloadable packages without retaining argv
+  or process output. Packet 4 remains to be implemented.
 
 ## Verification
 
@@ -41,7 +43,7 @@ The complete project gate passes (Ruff format, Ruff check, MyPy strict, and PyTe
 .venv/bin/pytest
 ```
 
-Result (2026-07-18, Packet 2 checkpoint): 75 tests passing, 86.28% total
+Result (2026-07-18, Packet 3 checkpoint): 82 tests passing, 85.65% total
 coverage; Ruff format/check and MyPy strict also pass. Structure-only dogfood
 against the real recovered Codex rollout found 277 tool attempts, 276 matched
 outputs, and one unmatched attempt; the adapter classified it as interrupted
@@ -72,8 +74,9 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
   threshold is >=80%.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
-- Command receipts, content-sensitive freshness, and the canonical recovery
-  package are not yet implemented. Gemini remains deliberately deferred.
+- Packet 4 still needs the multi-provider installed-wheel demo, descendant
+  process and interrupted-write fault injection, final browser receipt states,
+  and the physical-keyboard pass. Gemini remains deliberately deferred.
 - The in-app browser automation did not synthesize native Enter-key button
   activation even with focus correctly restored. A physical-keyboard pass
   remains part of the final UI gate; pointer navigation and focus restoration
@@ -81,8 +84,8 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
 
 ## Next Useful Work
 
-- Implement Recovery Loop v1 Packet 3 test-first: add content-sensitive Git
-  fingerprints, explicit shell-free CLI verification, private latest-attempt
-  receipts, freshness evaluation, and the canonical recovery package. The
-  public demo video, M3.c passive dogfood, attribution rescope, and Penny
-  capture integration remain deferred.
+- Implement Recovery Loop v1 Packet 4: extend the disposable demo across Inbox
+  → Brief → Receipt → Package, add the remaining fault-injection gates, verify
+  the built wheel and physical keyboard path, then refresh README and handoff
+  evidence. The public demo video, M3.c passive dogfood, attribution rescope,
+  and Penny capture integration remain deferred.

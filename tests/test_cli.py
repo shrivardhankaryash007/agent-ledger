@@ -5,12 +5,15 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 from typer.testing import CliRunner
 
 from agent_ledger.cli import app
+from agent_ledger.recovery.adapters.codex import CodexAdapter
+from agent_ledger.recovery.discovery import AdapterRoot, discover_sessions
 
 runner = CliRunner()
 
@@ -312,3 +315,93 @@ def test_cli_console_discovers_repository_bound_codex_session(
     assert "1 bound session" in result.output
     run_server.assert_called_once()
     open_browser.assert_not_called()
+
+
+def test_cli_verify_and_package_keep_explicit_argv_private(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    (repo / "safe.py").write_text("SAFE = True\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "--", "safe.py"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.name=Recovery Test",
+            "-c",
+            "user.email=demo@example.invalid",
+            "commit",
+            "-qm",
+            "seed",
+        ],
+        check=True,
+    )
+    codex_root = tmp_path / "codex-sessions"
+    transcript = create_fixture(
+        codex_root,
+        "rollout.jsonl",
+        [
+            {
+                "timestamp": "2026-07-18T00:00:00Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "verify-session",
+                    "cwd": str(repo),
+                    "timestamp": "2026-07-18T00:00:00Z",
+                },
+            }
+        ],
+    )
+    adapter = CodexAdapter()
+    discovery = discover_sessions(
+        repo=repo,
+        roots=(AdapterRoot(adapter=adapter, root=transcript.parent),),
+    )
+    candidate_id = discovery.sessions[0].candidate.candidate_id
+    output = tmp_path / "recovery-package.json"
+    private_value = "private-cli-argv-output"
+    environment = {
+        "AGENT_LEDGER_CLAUDE_PROJECTS_DIR": str(tmp_path / "no-claude"),
+        "AGENT_LEDGER_CODEX_SESSIONS_DIR": str(codex_root),
+        "AGENT_LEDGER_DATA_DIR": str(tmp_path / "private-data"),
+    }
+
+    with patch.dict(os.environ, environment):
+        verified = runner.invoke(
+            app,
+            [
+                "verify",
+                "--session",
+                candidate_id,
+                "--repo",
+                str(repo),
+                "--label",
+                "owner annotation",
+                "--",
+                sys.executable,
+                "-c",
+                f"print('{private_value}')",
+            ],
+        )
+        packaged = runner.invoke(
+            app,
+            [
+                "package",
+                "--session",
+                candidate_id,
+                "--repo",
+                str(repo),
+                "--output",
+                str(output),
+            ],
+        )
+
+    assert verified.exit_code == 0
+    assert '"outcome": "exited_zero"' in verified.output
+    assert private_value not in verified.output
+    assert packaged.exit_code == 0
+    package_payload = output.read_text(encoding="utf-8")
+    assert '"handoff_status": "current_exit_zero"' in package_payload
+    assert private_value not in package_payload

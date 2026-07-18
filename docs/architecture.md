@@ -135,6 +135,11 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
     command, responsive filters, history navigation, and redacted unsafe-source
     errors. The browser remains read-only and cannot select paths or execute
     commands.
+  - **Recovery Loop v1 Packet 3 (2026-07-18, ADR 0004).** Adds
+    content-sensitive Git fingerprints, explicit shell-free CLI verification,
+    privacy-redacted owner-only receipts, freshness evaluation, latest-attempt
+    precedence, and canonical recovery packages. The browser can read and
+    download these records but has no execution endpoint.
 - **M4 — budget wallet (former M3, content unchanged).** Per-agent token
   budgets; enforcement hook + Desk endpoint. *Gated by:* M2.5 (FS-2
   decision) AND attribution rescope #2 (per-project spend must cross the

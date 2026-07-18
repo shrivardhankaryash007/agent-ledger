@@ -80,6 +80,12 @@ class RecoveryCatalog:
 
         return self._catalog
 
+    @property
+    def trusted_repo(self) -> Path:
+        """Return the internal canonical repository root for local services."""
+
+        return self._repo
+
     def _selected(self, candidate_id: str) -> DiscoveredSession:
         try:
             return self._discovered[candidate_id]
