@@ -1,6 +1,6 @@
 # agent-ledger Status
 
-Last updated: 2026-07-18 (Recovery Loop v1 Packet 1 implemented and verified)
+Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-2 implemented and verified)
 
 ## Current Baseline
 
@@ -20,12 +20,15 @@ Last updated: 2026-07-18 (Recovery Loop v1 Packet 1 implemented and verified)
   fixed and read-only, unsafe paths fail closed, and the localhost console is
   protected by capability token, Host/Origin allowlists, no CORS, no-store,
   and restrictive CSP.
-- **Recovery Loop v1 Packet 1 is implemented and verified** (2026-07-18,
+- **Recovery Loop v1 Packets 1-2 are implemented and verified** (2026-07-18,
   ADR 0004): the provider-neutral adapter seam supports declared Claude Code
   and Codex JSONL formats, Codex calls pair with outputs only by exact call ID,
   discovery binds candidates to the exact trusted Git root, and contained
   absolute paths normalize safely. Raw call arguments and output bodies do not
-  enter public evidence models. Packets 2-4 remain to be implemented.
+  enter public evidence models. `agent-ledger console --repo PATH` now opens an
+  immutable Recovery Inbox with lazy digest-checked selection, redacted failure
+  states, filters, responsive layouts, and compatibility for the original
+  explicit-session console. Packets 3-4 remain to be implemented.
 
 ## Verification
 
@@ -38,12 +41,14 @@ The complete project gate passes (Ruff format, Ruff check, MyPy strict, and PyTe
 .venv/bin/pytest
 ```
 
-Result (2026-07-18, Packet 1 checkpoint): 70 tests passing, 86.15% total
+Result (2026-07-18, Packet 2 checkpoint): 75 tests passing, 86.28% total
 coverage; Ruff format/check and MyPy strict also pass. Structure-only dogfood
 against the real recovered Codex rollout found 277 tool attempts, 276 matched
 outputs, and one unmatched attempt; the adapter classified it as interrupted
-and discovered it only within the trusted repository boundary. The real
-localhost smoke cycle starts, fetches all product endpoints,
+and discovered it only within the trusted repository boundary. A real Inbox
+run over the workspace discovered 20 bound candidates and excluded 18; desktop
+at 1280px and narrow 390px renders had no horizontal overflow or console
+errors. The real localhost smoke cycle starts, fetches all product endpoints,
 stops, and cleans its synthetic repository. Browser review passes at 1440px
 desktop and 390px mobile; the mobile document has no horizontal overflow,
 keyboard skip/copy works, and the console reports zero errors or warnings. A
@@ -67,16 +72,17 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
   threshold is >=80%.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
-- The Recovery Loop browser still opens one preassembled brief; the planned
-  immutable multi-provider Inbox and lazy selected-session assembly are not yet
-  connected to the API or UI.
 - Command receipts, content-sensitive freshness, and the canonical recovery
   package are not yet implemented. Gemini remains deliberately deferred.
+- The in-app browser automation did not synthesize native Enter-key button
+  activation even with focus correctly restored. A physical-keyboard pass
+  remains part of the final UI gate; pointer navigation and focus restoration
+  are verified.
 
 ## Next Useful Work
 
-- Implement Recovery Loop v1 Packet 2 test-first: change the localhost console
-  from one preassembled brief to an immutable repository-bound candidate Inbox,
-  preserve the existing single-brief compatibility path, and add lazy
-  digest-checked selected-session assembly. The public demo video, M3.c passive
-  dogfood, attribution rescope, and Penny capture integration remain deferred.
+- Implement Recovery Loop v1 Packet 3 test-first: add content-sensitive Git
+  fingerprints, explicit shell-free CLI verification, private latest-attempt
+  receipts, freshness evaluation, and the canonical recovery package. The
+  public demo video, M3.c passive dogfood, attribution rescope, and Penny
+  capture integration remain deferred.

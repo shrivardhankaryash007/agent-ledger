@@ -22,7 +22,12 @@ from agent_ledger.ingest.claude_transcripts import ingest as ingest_transcripts
 from agent_ledger.ledger.pricing import load_pricing
 from agent_ledger.ledger.repository import all_records
 from agent_ledger.policy.replay import replay as run_replay
+from agent_ledger.recovery.adapters.claude_code import ClaudeCodeAdapter
+from agent_ledger.recovery.adapters.codex import CodexAdapter
 from agent_ledger.recovery.assembler import recover_session
+from agent_ledger.recovery.catalog import RecoveryCatalog
+from agent_ledger.recovery.discovery import AdapterRoot, discover_sessions
+from agent_ledger.recovery.git_state import resolve_repo
 from agent_ledger.recovery.prompt import render_recovery_prompt
 from agent_ledger.report.spend import per_project
 from agent_ledger.resume.detector import detect_ending
@@ -55,6 +60,22 @@ def _projects_dir() -> Path:
     )
 
 
+def _codex_sessions_dir() -> Path:
+    configured = os.environ.get("AGENT_LEDGER_CODEX_SESSIONS_DIR")
+    return (
+        Path(configured)
+        if configured is not None
+        else Path("~/.codex/sessions").expanduser()
+    )
+
+
+def _recovery_roots() -> tuple[AdapterRoot, ...]:
+    return (
+        AdapterRoot(adapter=ClaudeCodeAdapter(), root=_projects_dir()),
+        AdapterRoot(adapter=CodexAdapter(), root=_codex_sessions_dir()),
+    )
+
+
 def _find_transcript(session: str) -> Path:
     projects_dir = _projects_dir()
     if not projects_dir.is_dir():
@@ -83,6 +104,29 @@ def _serve_console(
     )
     url = f"http://127.0.0.1:{port}/?token={token}"
     typer.echo(f"Recovery console: {url}")
+    typer.echo("Press Ctrl+C to stop the local read-only server.")
+    if open_browser:
+        webbrowser.open(url)
+    uvicorn.run(console_app, host="127.0.0.1", port=port, log_level="warning")
+
+
+def _serve_inbox(
+    catalog: RecoveryCatalog,
+    *,
+    port: int,
+    open_browser: bool,
+) -> None:
+    token = secrets.token_urlsafe(24)
+    console_app = create_app(
+        catalog=catalog,
+        capability_token=token,
+        port=port,
+    )
+    url = f"http://127.0.0.1:{port}/?token={token}"
+    count = len(catalog.public.sessions)
+    noun = "session" if count == 1 else "sessions"
+    typer.echo(f"Recovery Inbox: {url}")
+    typer.echo(f"{count} bound {noun}; {catalog.public.excluded_count} excluded.")
     typer.echo("Press Ctrl+C to stop the local read-only server.")
     if open_browser:
         webbrowser.open(url)
@@ -316,6 +360,43 @@ def recover(
         typer.echo(json.dumps(brief.model_dump(mode="json"), indent=2))
     else:
         typer.echo(prompt, nl=False)
+
+
+@app.command()
+def console(
+    repo: Path = typer.Option(
+        Path.cwd(),
+        "--repo",
+        help="Trusted current Git repository.",
+    ),
+    no_open: bool = typer.Option(
+        False,
+        "--no-open",
+        help="Do not open the browser automatically.",
+    ),
+    port: int = typer.Option(
+        DEFAULT_CONSOLE_PORT,
+        "--port",
+        min=1,
+        max=65535,
+        help="Local console port.",
+    ),
+) -> None:
+    """Open the repository-bound local Recovery Inbox."""
+
+    try:
+        trusted_repo = resolve_repo(repo)
+        roots = _recovery_roots()
+        discovery = discover_sessions(repo=trusted_repo, roots=roots)
+        catalog = RecoveryCatalog(
+            repo=trusted_repo,
+            discovery=discovery,
+            adapters=tuple(root.adapter for root in roots),
+        )
+    except (OSError, ValueError, RuntimeError) as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    _serve_inbox(catalog, port=port, open_browser=not no_open)
 
 
 @app.command()

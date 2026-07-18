@@ -248,6 +248,8 @@ Acceptance gate: a sanitized Codex fixture with one unmatched custom call produc
 
 Acceptance gate: the exact canvas flow works at 1440px and 390px; keyboard-only selection, back navigation, focus restoration, filter state, and status announcements work; existing one-session API tests stay green through compatibility mode.
 
+**Implementation checkpoint (2026-07-18):** catalog and compatibility APIs, lazy digest-checked assembly, the responsive Inbox, filters, selected-session navigation, focus restoration, and redacted error states are implemented. Desktop and 390px rendered checks show no horizontal overflow and no console errors. Semantic keyboard controls and restored focus are present; synthetic Enter-key dispatch in the in-app browser did not activate native buttons, so a physical-keyboard pass remains open before the final Packet 4 UI gate.
+
 ### Packet 3 — receipt and package
 
 - Add content-sensitive repository fingerprints over HEAD, staged diff, tracked worktree diff, and untracked content; snapshot inability is an explicit non-current state.

@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="/static/app.css">
   </head>
   <body>
-    <a class="skip-link" href="#main">Skip to recovery brief</a>
+    <a class="skip-link" href="#main">Skip to recovery workspace</a>
     <div class="shell">
       <header class="masthead">
         <a class="wordmark" href="#main" aria-label="Agent Ledger recovery home">
@@ -25,11 +25,56 @@
       </header>
 
       <main id="main" tabindex="-1">
+        <section id="console-loading" class="loading-state" aria-live="polite">
+          <p class="kicker">LOCAL EVIDENCE</p>
+          <h1>Reading the recovery queue.</h1>
+          <p>Binding local sessions to the trusted repository…</p>
+        </section>
+
+        <section id="inbox-view" class="inbox-view" aria-labelledby="inbox-title" hidden>
+          <div class="inbox-hero">
+            <div>
+              <p class="eyebrow">TRUSTED REPOSITORY / RECOVERY INBOX</p>
+              <h1 id="inbox-title">Interrupted work,<br>ranked by evidence.</h1>
+              <p class="lede">Choose a repository-bound session. Agent Ledger will reconcile its recorded activity against the repository as it exists now.</p>
+            </div>
+            <div class="queue-counter" aria-label="Recovery queue summary">
+              <span class="field-label">RECOVERY QUEUE</span>
+              <strong id="queue-count">—</strong>
+              <span id="queue-review-count" class="status-chip">ASSESSING</span>
+            </div>
+          </div>
+
+          <div class="inbox-controls">
+            <div id="session-filters" class="filter-group" aria-label="Filter recovery sessions">
+              <button class="filter-button" type="button" data-filter="all" aria-pressed="true">ALL</button>
+              <button class="filter-button" type="button" data-filter="interrupted" aria-pressed="false">INTERRUPTED</button>
+              <button class="filter-button" type="button" data-filter="unknown" aria-pressed="false">UNKNOWN</button>
+              <button class="filter-button" type="button" data-filter="completed" aria-pressed="false">COMPLETED</button>
+            </div>
+            <p id="catalog-meta" class="catalog-meta"></p>
+          </div>
+          <p id="console-status" class="console-status" aria-live="polite"></p>
+
+          <div class="session-table" role="region" aria-labelledby="inbox-title">
+            <div class="session-table-head" aria-hidden="true">
+              <span>PROVIDER</span><span>SESSION</span><span>LAST SIGNAL</span><span>STATUS</span><span>ACTION</span>
+            </div>
+            <div id="session-list" class="session-list" aria-live="polite"></div>
+          </div>
+          <p id="session-empty" class="empty-state" hidden>No sessions match this filter.</p>
+        </section>
+
+        <section id="brief-view" class="brief-view" aria-labelledby="brief-title" hidden>
+          <div class="brief-toolbar">
+            <button id="back-to-inbox" class="back-button" type="button">← Recovery Inbox</button>
+            <span id="selected-provider" class="status-chip">SESSION</span>
+          </div>
         <section class="hero" aria-labelledby="brief-title">
           <div class="eyebrow">INTERRUPTED SESSION / VERIFIED RECOVERY</div>
           <div class="hero-grid">
             <div>
-              <h1 id="brief-title">The transcript remembers.<br>The repository decides.</h1>
+              <h1 id="brief-title" tabindex="-1">The transcript remembers.<br>The repository decides.</h1>
               <p class="lede">A current-state brief for the next agent, with every claim tied to local evidence.</p>
             </div>
             <div id="overall-status" class="overall-status" aria-live="polite">
@@ -114,7 +159,16 @@
           </button>
           <p id="copy-status" class="copy-status" aria-live="polite"></p>
         </section>
+        </section>
       </main>
+
+      <noscript>
+        <section class="fatal">
+          <p class="kicker">RECOVERY CONSOLE</p>
+          <h2>JavaScript is required.</h2>
+          <p>This local console needs JavaScript to request capability-protected recovery data. No remote scripts or services are used.</p>
+        </section>
+      </noscript>
 
       <footer>
         <span>AGENT LEDGER / RECOVERY BRIEF v1</span>

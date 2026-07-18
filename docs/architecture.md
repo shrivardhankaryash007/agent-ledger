@@ -30,8 +30,11 @@ decision.
   rendering. Provider call bodies remain private; structural results cross the
   adapter boundary only when paired by exact call ID. It does not import or
   modify `ledger/`.
-- `api/` — capability-protected localhost recovery console. Packaged static
-  assets, no CORS, no external resources, and no mutation endpoints.
+- `api/` — capability-protected localhost Recovery Inbox. Catalog mode exposes
+  only startup-bound opaque candidate IDs and lazily digest-checks transcript
+  evidence before fresh Git assembly; explicit-session compatibility mode keeps
+  the original aliases. Packaged static assets, no CORS, no external resources,
+  and no mutation endpoints.
 - `demo/` — disposable synthetic before/after Git scenario using the same
   recovery assembler and API as real sessions.
 - `cli/` — typer commands for ledger flows plus `recover` and the exact
@@ -126,6 +129,12 @@ mechanism the M0 acceptance test in `tests/test_m0_ingest_report.py` checks.
     rollout observed 277 attempts, 276 matched outputs, and one unmatched
     attempt, producing an honest `interrupted` classification without retaining
     raw call arguments or outputs.
+  - **Recovery Loop v1 Packet 2 (2026-07-18, ADR 0004).** Adds the immutable
+    repository-bound Recovery Inbox, lazy source-digest verification, selected
+    candidate recovery/prompt routes, a dedicated `agent-ledger console`
+    command, responsive filters, history navigation, and redacted unsafe-source
+    errors. The browser remains read-only and cannot select paths or execute
+    commands.
 - **M4 — budget wallet (former M3, content unchanged).** Per-agent token
   budgets; enforcement hook + Desk endpoint. *Gated by:* M2.5 (FS-2
   decision) AND attribution rescope #2 (per-project spend must cross the

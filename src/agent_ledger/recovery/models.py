@@ -70,6 +70,14 @@ class SessionCandidate(RecoveryModel):
     unmatched_call_count: int = Field(ge=0)
 
 
+class SessionCatalog(RecoveryModel):
+    """Repository-scoped candidate list safe for the Recovery Inbox."""
+
+    repo_name: str
+    sessions: tuple[SessionCandidate, ...]
+    excluded_count: int = Field(ge=0)
+
+
 class EvidenceRef(RecoveryModel):
     """Redacted locator and digest for one local evidence item."""
 

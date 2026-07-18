@@ -266,3 +266,49 @@ def test_cli_demo_smoke_uses_disposable_server() -> None:
 
     assert result.exit_code == 0
     assert "Demo smoke passed" in result.output
+
+
+def test_cli_console_discovers_repository_bound_codex_session(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+    codex_root = tmp_path / "codex-sessions"
+    create_fixture(
+        codex_root,
+        "rollout.jsonl",
+        [
+            {
+                "timestamp": "2026-07-18T00:00:00Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "console-session",
+                    "cwd": str(repo),
+                    "timestamp": "2026-07-18T00:00:00Z",
+                },
+            }
+        ],
+    )
+
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "AGENT_LEDGER_CLAUDE_PROJECTS_DIR": str(tmp_path / "no-claude"),
+                "AGENT_LEDGER_CODEX_SESSIONS_DIR": str(codex_root),
+            },
+        ),
+        patch("agent_ledger.cli.uvicorn.run") as run_server,
+        patch("agent_ledger.cli.webbrowser.open") as open_browser,
+    ):
+        result = runner.invoke(
+            app,
+            ["console", "--repo", str(repo), "--no-open", "--port", "8680"],
+        )
+
+    assert result.exit_code == 0
+    assert "Recovery Inbox:" in result.output
+    assert "1 bound session" in result.output
+    run_server.assert_called_once()
+    open_browser.assert_not_called()
