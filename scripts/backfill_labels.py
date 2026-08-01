@@ -40,6 +40,8 @@ from pathlib import Path
 from agent_ledger.ingest.git_label import resolve
 from agent_ledger.ledger.repository import delete_by_session_ids, update_labels
 
+UNKNOWN_PROJECT = "unknown"
+
 DEFAULT_DB_PATH = Path("data/ledger.db")
 DEFAULT_PROJECTS_DIR = Path("~/.claude/projects").expanduser()
 KNOWN_REPO_ROOTS = (Path("~/dev").expanduser(), Path("~/00_base").expanduser())
@@ -179,6 +181,7 @@ def run(db_path: Path, projects_dir: Path, *, dry_run: bool) -> None:
                 db_path,
                 session_id=row.session_id,
                 model_sku=row.model_sku,
+                project=label.repo_name or UNKNOWN_PROJECT,
                 repo_name=label.repo_name,
                 worktree_name=label.worktree_name,
                 branch=label.branch,

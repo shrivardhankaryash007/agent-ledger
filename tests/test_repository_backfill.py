@@ -60,6 +60,7 @@ def test_update_labels_leaves_tokens_and_cost_untouched(tmp_path: Path) -> None:
         db_path,
         session_id="sess-a:dev",
         model_sku="claude-sonnet-4-6",
+        project="dev",
         repo_name="dev",
         worktree_name=None,
         branch="main",
@@ -70,7 +71,31 @@ def test_update_labels_leaves_tokens_and_cost_untouched(tmp_path: Path) -> None:
     assert record.repo_name == "dev"
     assert record.branch == "main"
     assert record.label_source == "git"
+    assert record.project == "dev"
     # The historical record itself must be untouched by a label backfill.
     assert record.in_tokens == original.in_tokens
     assert record.cost_usd == original.cost_usd
-    assert record.project == original.project
+
+
+def test_update_labels_sets_project_to_unknown_when_unresolved(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "ledger.db"
+    upsert(db_path, _record("sess-a:-Users-yash-dev"))
+
+    update_labels(
+        db_path,
+        session_id="sess-a:-Users-yash-dev",
+        model_sku="claude-sonnet-4-6",
+        project="unknown",
+        repo_name=None,
+        worktree_name=None,
+        branch=None,
+        label_source="unknown",
+    )
+
+    (record,) = all_records(db_path)
+    # This is the whole point: a backfilled-but-unresolved row must not keep
+    # reporting under its old broken pre-fix label.
+    assert record.project == "unknown"
+    assert record.project != "-Users-yash-dev"

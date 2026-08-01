@@ -165,6 +165,7 @@ def update_labels(
     *,
     session_id: str,
     model_sku: str,
+    project: str,
     repo_name: str | None,
     worktree_name: str | None,
     branch: str | None,
@@ -172,9 +173,13 @@ def update_labels(
 ) -> None:
     """Backfill attribution columns on one already-stored row in place.
 
-    Used only by the one-off 2026-08 backfill (scripts/backfill_labels.py);
-    it never touches ``project``/tokens/cost — those are the original
-    historical record and stay exactly as ingested.
+    Used only by the one-off 2026-08 backfill (scripts/backfill_labels.py).
+    ``project`` is included and expected to follow the same convention live
+    ingest uses (``repo_name`` when resolved, else ``"unknown"``) — leaving
+    it at its pre-fix value would keep `report`/`replay` grouping legacy
+    rows under the exact broken labels this fix removes. Tokens/cost/
+    ``session_id`` are never touched here — that is the original historical
+    record and stays exactly as ingested.
     """
 
     migrate(db_path)
@@ -182,10 +187,19 @@ def update_labels(
         connection.execute(
             """
             UPDATE call_records
-            SET repo_name = ?, worktree_name = ?, branch = ?, label_source = ?
+            SET project = ?, repo_name = ?, worktree_name = ?, branch = ?,
+                label_source = ?
             WHERE session_id = ? AND model_sku = ?
             """,
-            (repo_name, worktree_name, branch, label_source, session_id, model_sku),
+            (
+                project,
+                repo_name,
+                worktree_name,
+                branch,
+                label_source,
+                session_id,
+                model_sku,
+            ),
         )
 
 

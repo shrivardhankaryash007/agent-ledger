@@ -72,7 +72,13 @@ into "I think I know."
    tokens/cost must never be touched — via path-decode and
    `git worktree list` matching only. Never by timestamp-correlating to
    commits; with 8+ repos active in overlapping windows that would invent
-   attribution instead of recovering it.
+   attribution instead of recovering it. `project` is updated alongside
+   the new columns for these rows too (`repo_name` when resolved, else
+   `"unknown"`) — an earlier version of `update_labels()` left `project`
+   at its pre-fix value, which meant `report`/`replay` kept grouping
+   backfilled rows under the exact broken labels this fix removes; caught
+   by spot-checking `agent-ledger report` after the first backfill run,
+   not by any test (see Consequences).
 7. **The rule is the artifact, not just this collector's code.** The next
    collector — Codex, Antigravity, whatever comes next — inherits "resolve
    cwd to git identity, fail honest" from this ADR, not by re-deriving the
