@@ -1,10 +1,14 @@
 """M0 ingest source: Claude Code JSONL transcripts.
 
-Reads `<source_dir>/<project-dir>/*.jsonl` (rglob), one directory per
-project (the directory name IS the project — Claude Code names it from the
-sanitized cwd). This is the one gap found in the existing workspace ledger
-(`~/dev/scripts/ide_meter.py` parses the same files but discards the parent
-directory name); this module captures it as `CallRecord.project`.
+Reads `<source_dir>/<project-dir>/*.jsonl` (rglob). Each line's `cwd` field
+is resolved to a repo identity via `ingest.git_label.resolve` (fix spec
+2026-08-02, docs/decisions/0005-attribution-keys-on-git-identity.md) —
+*not* a directory basename. The old basename convention (Claude Code's own
+sanitized-cwd project-dir naming, and this module's original
+`path.parent.name` fallback) is what produced 86% unusable labels on the
+real corpus: launch directory, not working repo. `source_dir`'s per-project
+directory layout is still how transcripts are discovered on disk; it plays
+no part in attribution anymore.
 
 Independent of `~/dev/scripts/token_ledger.py` / `ide_meter.py` by design —
 see AGENTS.md rule 2. Parse/classify logic may be *read* from those files as
@@ -20,11 +24,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from agent_ledger.ledger.models import CallRecord
+from agent_ledger.ingest.git_label import GitLabel, resolve
+from agent_ledger.ledger.models import CallRecord, LabelSource
 from agent_ledger.ledger.pricing import cost_usd, load_pricing
 from agent_ledger.ledger.repository import migrate, upsert
 
 SYNTHETIC_MODEL = "<synthetic>"
+UNKNOWN_PROJECT = "unknown"
 
 
 @dataclass
@@ -33,6 +39,11 @@ class Bucket:
 
     session_id: str
     project: str
+    repo_name: str | None
+    worktree_name: str | None
+    branch: str | None
+    label_source: LabelSource
+    cwd_raw: str | None = None
     in_tokens: int = 0
     out_tokens: int = 0
     calls: int = 0
@@ -119,10 +130,43 @@ def iter_transcript_lines(
         yield cast("dict[object, object]", decoded)
 
 
-def parse_transcript(path: Path) -> list[CallRecord]:
-    """Aggregate one transcript into per-model records with project context."""
+def _bucket_tag(label: GitLabel) -> str:
+    """Short human string identifying a bucket's attribution, for session_id
+    disambiguation only — never stored as ``project`` directly."""
 
-    buckets: dict[tuple[str, str], Bucket] = {}
+    if label.label_source != "git" or not label.repo_name:
+        return UNKNOWN_PROJECT
+    if label.worktree_name:
+        return f"{label.repo_name}-{label.worktree_name}"
+    return label.repo_name
+
+
+def parse_transcript(
+    path: Path, *, git_cache: dict[str, GitLabel] | None = None
+) -> list[CallRecord]:
+    """Aggregate one transcript into per-model records with git-resolved
+    attribution.
+
+    Args:
+        path: Transcript JSONL file.
+        git_cache: Optional cwd -> GitLabel memo shared across an `ingest()`
+            run — most consecutive lines in a session share one cwd, and
+            each resolution costs three `git` subprocess calls, so reusing
+            results across files matters at real transcript volume.
+    """
+
+    cache: dict[str, GitLabel] = git_cache if git_cache is not None else {}
+
+    def resolve_cached(cwd: str | None) -> GitLabel:
+        if not cwd:
+            return resolve(None)
+        cached = cache.get(cwd)
+        if cached is None:
+            cached = resolve(cwd)
+            cache[cwd] = cached
+        return cached
+
+    buckets: dict[tuple[str, str | None, str | None, LabelSource], Bucket] = {}
     for record in iter_transcript_lines(path):
         message_value = record.get("message")
         if not isinstance(message_value, dict):
@@ -140,18 +184,28 @@ def parse_transcript(path: Path) -> list[CallRecord]:
         usage = cast("dict[object, object]", usage_value)
         session_id = str(record.get("sessionId") or path.stem)
 
-        cwd = record.get("cwd")
-        if isinstance(cwd, str) and cwd:
-            project_for_line = Path(cwd).name
-            bucket_session_id = f"{session_id}:{project_for_line}"
-        else:
-            project_for_line = path.parent.name
-            bucket_session_id = session_id
+        cwd_value = record.get("cwd")
+        cwd_raw = cwd_value if isinstance(cwd_value, str) and cwd_value else None
+        label = resolve_cached(cwd_raw)
 
+        project = label.repo_name if label.label_source == "git" else None
+        project = project or UNKNOWN_PROJECT
+        bucket_session_id = f"{session_id}:{_bucket_tag(label)}"
+
+        key = (model, label.repo_name, label.worktree_name, label.label_source)
         bucket = buckets.setdefault(
-            (model, project_for_line),
-            Bucket(session_id=bucket_session_id, project=project_for_line),
+            key,
+            Bucket(
+                session_id=bucket_session_id,
+                project=project,
+                repo_name=label.repo_name,
+                worktree_name=label.worktree_name,
+                branch=label.branch,
+                label_source=label.label_source,
+            ),
         )
+        if cwd_raw:
+            bucket.cwd_raw = cwd_raw
         bucket.in_tokens += _token_count(usage.get("input_tokens"))
         bucket.in_tokens += _token_count(usage.get("cache_creation_input_tokens"))
         bucket.out_tokens += _token_count(usage.get("output_tokens"))
@@ -162,7 +216,7 @@ def parse_transcript(path: Path) -> list[CallRecord]:
 
     prices = load_pricing()
     records: list[CallRecord] = []
-    for (model, _project), bucket in buckets.items():
+    for (model, *_key), bucket in buckets.items():
         if model not in prices:
             raise ValueError(f"no pricing configured for transcript model {model!r}")
         capability_class, vendor = classify(model)
@@ -178,6 +232,11 @@ def parse_transcript(path: Path) -> list[CallRecord]:
                 out_tokens=bucket.out_tokens,
                 cost_usd=cost_usd(model, bucket.in_tokens, bucket.out_tokens, prices),
                 calls=bucket.calls,
+                repo_name=bucket.repo_name,
+                worktree_name=bucket.worktree_name,
+                branch=bucket.branch,
+                cwd_raw=bucket.cwd_raw,
+                label_source=bucket.label_source,
             )
         )
     return records
@@ -187,9 +246,10 @@ def ingest(source_dir: Path, db_path: Path) -> int:
     """Scan ``source_dir`` and idempotently upsert every parsed record."""
 
     migrate(db_path)
+    git_cache: dict[str, GitLabel] = {}
     written = 0
     for path in sorted(source_dir.rglob("*.jsonl")):
-        for record in parse_transcript(path):
+        for record in parse_transcript(path, git_cache=git_cache):
             upsert(db_path, record)
             written += 1
     return written

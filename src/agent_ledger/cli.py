@@ -19,6 +19,12 @@ import uvicorn
 from agent_ledger.api.app import create_app
 from agent_ledger.demo.scenario import DemoError, build_demo_scenario, run_demo_smoke
 from agent_ledger.ingest.claude_transcripts import ingest as ingest_transcripts
+from agent_ledger.ledger.heartbeat import (
+    STALE_THRESHOLD_HOURS,
+    build_report,
+    record_failure,
+    record_success,
+)
 from agent_ledger.ledger.pricing import load_pricing
 from agent_ledger.ledger.repository import all_records
 from agent_ledger.policy.replay import replay as run_replay
@@ -165,9 +171,20 @@ def ingest(
     source_dir: Path = typer.Argument(..., help="e.g. ~/.claude/projects"),
     db_path: Path = DEFAULT_DB_PATH,
 ) -> None:
-    """Ingest Claude Code transcripts under source_dir into db_path."""
+    """Ingest Claude Code transcripts under source_dir into db_path.
 
-    count = ingest_transcripts(source_dir, db_path)
+    Records a heartbeat row on every run, success or failure (Fix 2,
+    2026-08-02) — `agent-ledger doctor` reads these to catch a silent
+    collection gap instead of nothing noticing at all.
+    """
+
+    try:
+        count = ingest_transcripts(source_dir, db_path)
+    except (OSError, ValueError, RuntimeError) as exc:
+        record_failure(db_path, str(exc))
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    record_success(db_path, count)
     typer.echo(f"Ingested {count} record(s) into {db_path}")
 
 
@@ -177,6 +194,47 @@ def report(db_path: Path = DEFAULT_DB_PATH) -> None:
 
     frame = per_project(db_path)
     typer.echo(frame)
+
+
+@app.command()
+def doctor(db_path: Path = DEFAULT_DB_PATH) -> None:
+    """Print ledger staleness: newest row age, last heartbeat, recent volume.
+
+    Exits non-zero when the ledger is stale (Fix 2, 2026-08-02) — no rows
+    ever, or the newest one older than `STALE_THRESHOLD_HOURS` — so this is
+    safe to wire into a shell prompt or cron/launchd check.
+    """
+
+    doctor_report = build_report(db_path)
+
+    if doctor_report.newest_row_ts is None:
+        typer.echo("Newest row: none — ledger has never been ingested")
+    else:
+        age = doctor_report.newest_row_age_hours or 0.0
+        typer.echo(
+            f"Newest row: {doctor_report.newest_row_ts.isoformat()} ({age:.1f}h ago)"
+        )
+    typer.echo(f"Total rows: {doctor_report.total_rows}")
+    typer.echo(f"Rows in last 7 days: {doctor_report.rows_last_7_days}")
+
+    if doctor_report.last_heartbeat_ts is None:
+        typer.echo("Last heartbeat: never recorded (no `ingest` run yet)")
+    else:
+        typer.echo(
+            f"Last heartbeat: {doctor_report.last_heartbeat_ts.isoformat()} "
+            f"status={doctor_report.last_heartbeat_status}"
+        )
+        if doctor_report.last_heartbeat_error:
+            typer.echo(f"  error: {doctor_report.last_heartbeat_error}")
+
+    if doctor_report.is_stale:
+        typer.echo(
+            f"STALE: no successful ingest in over {STALE_THRESHOLD_HOURS:.0f}h "
+            "— run `agent-ledger ingest ~/.claude/projects`.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    typer.echo("OK: ledger is current.")
 
 
 @app.command()

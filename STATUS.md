@@ -1,8 +1,34 @@
 # agent-ledger Status
 
-Last updated: 2026-07-18 (Recovery Loop v1 Packets 1-3 implemented and verified)
+Last updated: 2026-08-02 (Attribution fix v2, ADR 0005 — git-aware labels,
+collector heartbeat, launchd automation)
 
 ## Current Baseline
+
+- **Attribution fix v2 is implemented and verified against real production
+  data** (2026-08-02, ADR 0005): the M0 kill criterion that fired twice
+  (2026-07-06 original, then again after the cwd-basename rescope) is now
+  fixed at the root — attribution keys on git repo identity
+  (`ingest/git_label.py`), not a cwd/launch-directory basename, and never
+  silently falls back to one. `CallRecord` gained `repo_name`/
+  `worktree_name`/`branch`/`cwd_raw`/`label_source` (schema v2, migrated
+  in place, no data loss). A 26-day silent ingestion gap
+  (2026-07-06 -> 2026-08-01) was found and closed: a `collector_heartbeat`
+  table + `agent-ledger doctor` make the next gap visible, and a real
+  launchd agent (`com.yashshrivardhankar.agent-ledger.ingest`, loaded and
+  verified) now runs `ingest` daily so there doesn't need to be a next
+  gap. Production `data/ledger.db` was migrated, idempotency-verified
+  (two consecutive real `ingest` runs produced identical totals), and
+  backfilled (`scripts/backfill_labels.py`, one-off): 45 pre-fix rows
+  proven superseded by a reprocessed v2 row were deleted, 74 more with a
+  still-resolvable path were relabeled, 81 whose source transcript no
+  longer exists were left honestly `label_source='unknown'` — their
+  tokens/cost untouched. Final state: 342 rows, $1,596.36. Of cost where a
+  cwd was actually recorded, 98.5% now resolves via git (the ~26%
+  unattributed share on the *full* corpus is 100% irreplaceable pre-fix
+  legacy debt, not a defect in the new path — see ADR 0005 Consequences).
+- Known Gaps' "Per-project attribution remains below threshold" entry
+  below is superseded by this fix; kept for history.
 
 - **M0, M1, M2 are all built and verified against real data** (2026-07-05),
   not just fixtures: M0 (historical ledger + per-project report), M1 (litellm
@@ -43,6 +69,9 @@ The complete project gate passes (Ruff format, Ruff check, MyPy strict, and PyTe
 .venv/bin/pytest
 ```
 
+Result (2026-08-02, Attribution fix v2 checkpoint): 100 tests passing,
+86.24% total coverage; Ruff format/check and MyPy strict also pass.
+
 Result (2026-07-18, Packet 3 checkpoint): 82 tests passing, 85.65% total
 coverage; Ruff format/check and MyPy strict also pass. Structure-only dogfood
 against the real recovered Codex rollout found 277 tool attempts, 276 matched
@@ -71,7 +100,10 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
 
 - **Per-project attribution remains below threshold after rescope:** 57.8%
   of call volume is now project-specific on the real corpus, but the M0 kill
-  threshold is >=80%.
+  threshold is >=80%. **Superseded 2026-08-02 (ADR 0005):** attribution now
+  keys on git repo identity; 98.5% of cost with a recorded cwd resolves.
+  Kept here for history — see "Current Baseline" above for the current
+  number.
 - A Build Week-ready public YouTube demo (under three minutes) is not yet
   available; final Devpost submission remains intentionally deferred.
 - Packet 4 still needs the multi-provider installed-wheel demo, descendant
@@ -84,6 +116,13 @@ HTML/CSS/JS/favicon/demo assets were present and its demo smoke passed.
 
 ## Next Useful Work
 
+- `data/ledger.db.pre-backfill-2026-08-02.bak` is a safety snapshot from
+  before the 2026-08-02 backfill ran (gitignored, not committed) — safe to
+  delete once the final numbers above have been reviewed.
+  `scripts/backfill_labels.py` was written for that one-off run only, not
+  as a permanent tool; a second run today is a harmless no-op (no
+  `model_version=1` rows remain) but it isn't meant to become a recurring
+  command.
 - Implement Recovery Loop v1 Packet 4: extend the disposable demo across Inbox
   → Brief → Receipt → Package, add the remaining fault-injection gates, verify
   the built wheel and physical keyboard path, then refresh README and handoff

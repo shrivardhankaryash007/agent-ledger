@@ -4,17 +4,25 @@ except through this file (AGENTS.md rule 1)."""
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterable
 from pathlib import Path
 
 from agent_ledger.ledger.models import CallRecord
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
-SCHEMA_SQL = """
+SCHEMA_META_SQL = """
 CREATE TABLE IF NOT EXISTS schema_meta (
     version INTEGER NOT NULL
 );
+"""
 
+# Includes the v2 attribution columns (repo_name, worktree_name, branch,
+# cwd_raw, label_source) so a brand-new database is created at the current
+# shape directly. An existing v1 database instead goes through the
+# ALTER TABLE path in migrate() below — CREATE TABLE IF NOT EXISTS is a
+# no-op against an already-existing table, columns and all.
+CALL_RECORDS_SQL = """
 CREATE TABLE IF NOT EXISTS call_records (
     model_version INTEGER NOT NULL,
     ts TEXT NOT NULL,
@@ -27,25 +35,61 @@ CREATE TABLE IF NOT EXISTS call_records (
     out_tokens INTEGER NOT NULL,
     cost_usd REAL NOT NULL,
     calls INTEGER NOT NULL,
+    repo_name TEXT,
+    worktree_name TEXT,
+    branch TEXT,
+    cwd_raw TEXT,
+    label_source TEXT,
     PRIMARY KEY (session_id, model_sku)
 );
 """
 
+# Fix 2 (2026-08-02): one row per `ingest` invocation, success or failure,
+# so a silent 26-day collection gap becomes a measurable staleness signal
+# instead of nothing at all. See agent_ledger.ledger.heartbeat.
+HEARTBEAT_SQL = """
+CREATE TABLE IF NOT EXISTS collector_heartbeat (
+    ts TEXT NOT NULL,
+    status TEXT NOT NULL,
+    error TEXT,
+    rows_written INTEGER NOT NULL
+);
+"""
+
+_V1_TO_V2_COLUMNS = ("repo_name", "worktree_name", "branch", "cwd_raw", "label_source")
+
 
 def migrate(db_path: Path) -> None:
-    """Create the schema at ``db_path`` and record its version."""
+    """Create or upgrade the schema at ``db_path`` in place, no data loss."""
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as connection:
-        connection.executescript(SCHEMA_SQL)
+        connection.executescript(SCHEMA_META_SQL + CALL_RECORDS_SQL + HEARTBEAT_SQL)
         row = connection.execute("SELECT version FROM schema_meta").fetchone()
         if row is None:
             connection.execute(
                 "INSERT INTO schema_meta (version) VALUES (?)", (SCHEMA_VERSION,)
             )
-        elif row[0] != SCHEMA_VERSION:
-            msg = f"unsupported schema version {row[0]}; expected {SCHEMA_VERSION}"
-            raise RuntimeError(msg)
+            return
+        current_version = row[0]
+        if current_version == SCHEMA_VERSION:
+            return
+        if current_version == 1:
+            existing_columns = {
+                info[1]
+                for info in connection.execute("PRAGMA table_info(call_records)")
+            }
+            for column in _V1_TO_V2_COLUMNS:
+                if column not in existing_columns:
+                    # column is one of the fixed names in _V1_TO_V2_COLUMNS
+                    # above, never external input.
+                    connection.execute(
+                        f"ALTER TABLE call_records ADD COLUMN {column} TEXT"
+                    )
+            connection.execute("UPDATE schema_meta SET version = ?", (SCHEMA_VERSION,))
+            return
+        msg = f"unsupported schema version {current_version}; expected {SCHEMA_VERSION}"
+        raise RuntimeError(msg)
 
 
 def upsert(db_path: Path, record: CallRecord) -> None:
@@ -57,8 +101,9 @@ def upsert(db_path: Path, record: CallRecord) -> None:
             """
             INSERT INTO call_records (
                 model_version, ts, session_id, project, model_sku,
-                capability_class, vendor, in_tokens, out_tokens, cost_usd, calls
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                capability_class, vendor, in_tokens, out_tokens, cost_usd,
+                calls, repo_name, worktree_name, branch, cwd_raw, label_source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (session_id, model_sku) DO UPDATE SET
                 model_version = excluded.model_version,
                 ts = excluded.ts,
@@ -68,7 +113,12 @@ def upsert(db_path: Path, record: CallRecord) -> None:
                 in_tokens = excluded.in_tokens,
                 out_tokens = excluded.out_tokens,
                 cost_usd = excluded.cost_usd,
-                calls = excluded.calls
+                calls = excluded.calls,
+                repo_name = excluded.repo_name,
+                worktree_name = excluded.worktree_name,
+                branch = excluded.branch,
+                cwd_raw = excluded.cwd_raw,
+                label_source = excluded.label_source
             """,
             (
                 record.model_version,
@@ -82,6 +132,11 @@ def upsert(db_path: Path, record: CallRecord) -> None:
                 record.out_tokens,
                 record.cost_usd,
                 record.calls,
+                record.repo_name,
+                record.worktree_name,
+                record.branch,
+                record.cwd_raw,
+                record.label_source,
             ),
         )
 
@@ -95,9 +150,67 @@ def all_records(db_path: Path) -> list[CallRecord]:
         rows = connection.execute(
             """
             SELECT model_version, ts, session_id, project, model_sku,
-                   capability_class, vendor, in_tokens, out_tokens, cost_usd, calls
+                   capability_class, vendor, in_tokens, out_tokens, cost_usd,
+                   calls, repo_name, worktree_name, branch, cwd_raw,
+                   label_source
             FROM call_records
             ORDER BY session_id, model_sku
             """
         ).fetchall()
     return [CallRecord.model_validate(dict(row)) for row in rows]
+
+
+def update_labels(
+    db_path: Path,
+    *,
+    session_id: str,
+    model_sku: str,
+    repo_name: str | None,
+    worktree_name: str | None,
+    branch: str | None,
+    label_source: str | None,
+) -> None:
+    """Backfill attribution columns on one already-stored row in place.
+
+    Used only by the one-off 2026-08 backfill (scripts/backfill_labels.py);
+    it never touches ``project``/tokens/cost — those are the original
+    historical record and stay exactly as ingested.
+    """
+
+    migrate(db_path)
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            UPDATE call_records
+            SET repo_name = ?, worktree_name = ?, branch = ?, label_source = ?
+            WHERE session_id = ? AND model_sku = ?
+            """,
+            (repo_name, worktree_name, branch, label_source, session_id, model_sku),
+        )
+
+
+def delete_by_session_ids(db_path: Path, session_ids: Iterable[str]) -> int:
+    """Delete every row whose exact ``session_id`` is in ``session_ids``.
+
+    Used only by the one-off 2026-08 backfill (scripts/backfill_labels.py)
+    to remove pre-migration rows proven redundant: their source transcript
+    still exists on disk and has already been fully reprocessed under the
+    v2 bucketing scheme, so the old row is a stale duplicate, not unique
+    history. Never used for rows whose source no longer exists — those are
+    the one irreplaceable copy of that spend and must survive (AGENTS.md
+    rule 1).
+    """
+
+    migrate(db_path)
+    ids = list(session_ids)
+    if not ids:
+        return 0
+    with sqlite3.connect(db_path) as connection:
+        # placeholders is just N repeated "?" markers; ids are still bound
+        # as parameters below, never interpolated into the SQL text.
+        placeholders = ",".join("?" for _ in ids)
+        cursor = connection.execute(
+            f"DELETE FROM call_records WHERE session_id IN ({placeholders})",
+            ids,
+        )
+        return cursor.rowcount

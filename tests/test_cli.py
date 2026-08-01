@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,16 +36,46 @@ def test_cli_ingest_report_replay(tmp_path: Path) -> None:
     """Test ingest, report, and replay CLI commands with a temporary DB."""
     db_path = tmp_path / "test_ledger.db"
 
-    # Create a dummy transcript directory
+    # A real git repo, since M0 attribution is git-resolved (fix spec
+    # 2026-08-02) — the transcript's project dir name plays no part in it.
+    repo = tmp_path / "test_repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.email=test@test",
+            "-c",
+            "user.name=Test",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+        cwd=repo,
+        check=True,
+    )
+
     transcripts_dir = tmp_path / "projects" / "test_proj"
     transcripts_dir.mkdir(parents=True)
     transcript_file = transcripts_dir / "session.jsonl"
-    dummy_line = (
-        '{"message": {"model": "claude-sonnet-5", '
-        '"usage": {"input_tokens": 10, "output_tokens": 5}}, '
-        '"sessionId": "s1", "timestamp": "2026-07-06T10:00:00Z"}\n'
+    dummy_line = json.dumps(
+        {
+            "message": {
+                "model": "claude-sonnet-5",
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            },
+            "sessionId": "s1",
+            # Dynamic, not a fixed past date: the doctor assertion below
+            # needs this to be within STALE_THRESHOLD_HOURS of "now".
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+            "cwd": str(repo),
+        }
     )
-    transcript_file.write_text(dummy_line, encoding="utf-8")
+    transcript_file.write_text(dummy_line + "\n", encoding="utf-8")
 
     # Run ingest
     result = runner.invoke(
@@ -56,12 +87,59 @@ def test_cli_ingest_report_replay(tmp_path: Path) -> None:
     # Run report
     result = runner.invoke(app, ["report", "--db-path", str(db_path)])
     assert result.exit_code == 0
-    assert "test_proj" in result.output
+    assert "test_repo" in result.output
 
     # Run replay
     result = runner.invoke(app, ["replay", "--db-path", str(db_path)])
     assert result.exit_code == 0
     assert "Actual spend:" in result.output
+
+    # Run doctor — fresh right after the ingest that just ran above.
+    result = runner.invoke(app, ["doctor", "--db-path", str(db_path)])
+    assert result.exit_code == 0
+    assert "OK: ledger is current." in result.output
+    assert "Last heartbeat:" in result.output
+    assert "status=success" in result.output
+
+
+def test_cli_doctor_reports_stale_on_empty_ledger(tmp_path: Path) -> None:
+    db_path = tmp_path / "empty_ledger.db"
+
+    result = runner.invoke(app, ["doctor", "--db-path", str(db_path)])
+
+    assert result.exit_code == 1
+    assert "STALE" in result.output
+    assert "never recorded" in result.output
+
+
+def test_cli_ingest_records_failure_heartbeat_on_bad_pricing(tmp_path: Path) -> None:
+    db_path = tmp_path / "ledger.db"
+    transcripts_dir = tmp_path / "projects" / "unpriced"
+    transcripts_dir.mkdir(parents=True)
+    (transcripts_dir / "session.jsonl").write_text(
+        json.dumps(
+            {
+                "sessionId": "s1",
+                "timestamp": "2026-08-01T10:00:00Z",
+                "message": {
+                    "model": "totally-unpriced-model",
+                    "usage": {"input_tokens": 10, "output_tokens": 5},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app, ["ingest", str(transcripts_dir.parent), "--db-path", str(db_path)]
+    )
+    assert result.exit_code == 1
+    assert "Error:" in result.output
+
+    doctor_result = runner.invoke(app, ["doctor", "--db-path", str(db_path)])
+    assert "status=failure" in doctor_result.output
+    assert "totally-unpriced-model" in doctor_result.output
 
 
 def test_cli_resume_list(tmp_path: Path) -> None:

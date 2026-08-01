@@ -75,8 +75,11 @@ def test_parse_transcript_skips_unusable_lines(tmp_path: Path) -> None:
     records = parse_transcript(path)
 
     assert len(records) == 1
-    assert records[0].session_id == "session"
-    assert records[0].project == "project"
+    # No cwd on any surviving line -> label_source='unknown', so the bucket
+    # tag is "unknown" (fix spec 2026-08-02; no path.parent.name fallback).
+    assert records[0].session_id == "session:unknown"
+    assert records[0].label_source == "unknown"
+    assert records[0].project == "unknown"
     assert records[0].in_tokens == 0
     assert records[0].out_tokens == 0
     assert records[0].calls == 1
