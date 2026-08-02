@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, NonNegativeInt
 
-MODEL_VERSION = 2
+MODEL_VERSION = 3
 
 # 'git': repo_name resolved via git. 'not_a_repo': cwd_raw resolved to a real
 # path that git rejected. 'unknown': no cwd was available to resolve, or a
@@ -28,6 +28,20 @@ class CallRecord(BaseModel):
     it was actually checked out in. All five are ``None`` for sources that
     never attempt cwd-based git resolution (e.g. M1 live capture, which
     attributes via an explicit caller tag instead).
+
+    ``cache_read_tokens``/``cache_write_tokens`` are additive v3 fields
+    (2026-08-02). Before v3, ``cache_read_input_tokens`` was never read from
+    transcripts at all, so the largest token stream on a cached-prefix
+    harness was invisible and ``cost_usd`` was understated.
+
+    ``in_tokens`` deliberately keeps its v1/v2 meaning — fresh input **plus**
+    cache writes — so every historical row stays comparable against every new
+    one. ``cache_write_tokens`` is therefore a redundant *breakdown* of part
+    of ``in_tokens``, not a disjoint stream; ``cache_read_tokens`` is genuinely
+    new volume and is not counted in ``in_tokens``. This redundancy is
+    intentional: collapsing it would silently change what ``in_tokens`` means
+    across the version boundary, which AGENTS.md rule 1 exists to prevent.
+    Both default to ``0``, meaning "not measured" on pre-v3 rows.
     """
 
     model_version: int = MODEL_VERSION
@@ -39,6 +53,8 @@ class CallRecord(BaseModel):
     vendor: str
     in_tokens: NonNegativeInt
     out_tokens: NonNegativeInt
+    cache_read_tokens: NonNegativeInt = 0
+    cache_write_tokens: NonNegativeInt = 0
     cost_usd: float = Field(ge=0.0)
     calls: NonNegativeInt
     repo_name: str | None = None

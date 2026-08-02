@@ -1,11 +1,18 @@
 # Versioned pricing table (USD per 1k tokens). Source: ~/dev/standards/agentic-os/MODEL-PRICING.md,
-# verified 2026-07-05 against the Claude API pricing table (claude-api skill).
+# verified 2026-08-02 against the Claude API pricing table (claude-api skill).
 # Update whenever that file updates; do not let the two drift. Standard
 # sticker rates only (no promotional/intro pricing) to avoid silent drift
 # when a promo window expires.
-version: 2
+#
+# v3 (2026-08-02): `cache_read` and `cache_write` are optional per SKU. When
+# omitted they are derived from `input` using Anthropic's published
+# multipliers (0.1x read, 1.25x write) in ledger.pricing — so adding cache
+# accounting did not require re-stating rates for every historical SKU. State
+# them explicitly only for a SKU whose cache rates diverge from those ratios.
+version: 3
 skus:
   claude-fable-5: { input: 0.010, output: 0.050, vendor: anthropic }
+  claude-opus-5: { input: 0.005, output: 0.025, vendor: anthropic }
   claude-opus-4-8: { input: 0.005, output: 0.025, vendor: anthropic }
   claude-opus-4-7: { input: 0.005, output: 0.025, vendor: anthropic }
   claude-sonnet-5: { input: 0.003, output: 0.015, vendor: anthropic }

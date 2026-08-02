@@ -9,7 +9,7 @@ from pathlib import Path
 
 from agent_ledger.ledger.models import CallRecord
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_META_SQL = """
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS call_records (
     vendor TEXT NOT NULL,
     in_tokens INTEGER NOT NULL,
     out_tokens INTEGER NOT NULL,
+    cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0,
     cost_usd REAL NOT NULL,
     calls INTEGER NOT NULL,
     repo_name TEXT,
@@ -57,10 +59,20 @@ CREATE TABLE IF NOT EXISTS collector_heartbeat (
 """
 
 _V1_TO_V2_COLUMNS = ("repo_name", "worktree_name", "branch", "cwd_raw", "label_source")
+# v3 (2026-08-02): cache accounting. NOT NULL DEFAULT 0 rather than nullable —
+# a pre-v3 row genuinely has zero *measured* cache volume, and the re-ingest
+# pass is what replaces the zero with the real figure wherever the source
+# transcript still exists on disk.
+_V2_TO_V3_COLUMNS = ("cache_read_tokens", "cache_write_tokens")
 
 
 def migrate(db_path: Path) -> None:
-    """Create or upgrade the schema at ``db_path`` in place, no data loss."""
+    """Create or upgrade the schema at ``db_path`` in place, no data loss.
+
+    Upgrades are cumulative: a v1 database gains the v2 attribution columns
+    and then the v3 cache columns in the same call, so a database that sat
+    out a release still lands on the current shape in one step.
+    """
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as connection:
@@ -74,22 +86,31 @@ def migrate(db_path: Path) -> None:
         current_version = row[0]
         if current_version == SCHEMA_VERSION:
             return
+        if current_version not in (1, 2):
+            msg = (
+                f"unsupported schema version {current_version}; "
+                f"expected {SCHEMA_VERSION}"
+            )
+            raise RuntimeError(msg)
+
+        existing_columns = {
+            info[1] for info in connection.execute("PRAGMA table_info(call_records)")
+        }
+        # Every column name below is a fixed literal from the tuples above,
+        # never external input.
         if current_version == 1:
-            existing_columns = {
-                info[1]
-                for info in connection.execute("PRAGMA table_info(call_records)")
-            }
             for column in _V1_TO_V2_COLUMNS:
                 if column not in existing_columns:
-                    # column is one of the fixed names in _V1_TO_V2_COLUMNS
-                    # above, never external input.
                     connection.execute(
                         f"ALTER TABLE call_records ADD COLUMN {column} TEXT"
                     )
-            connection.execute("UPDATE schema_meta SET version = ?", (SCHEMA_VERSION,))
-            return
-        msg = f"unsupported schema version {current_version}; expected {SCHEMA_VERSION}"
-        raise RuntimeError(msg)
+        for column in _V2_TO_V3_COLUMNS:
+            if column not in existing_columns:
+                connection.execute(
+                    f"ALTER TABLE call_records "
+                    f"ADD COLUMN {column} INTEGER NOT NULL DEFAULT 0"
+                )
+        connection.execute("UPDATE schema_meta SET version = ?", (SCHEMA_VERSION,))
 
 
 def upsert(db_path: Path, record: CallRecord) -> None:
@@ -101,9 +122,10 @@ def upsert(db_path: Path, record: CallRecord) -> None:
             """
             INSERT INTO call_records (
                 model_version, ts, session_id, project, model_sku,
-                capability_class, vendor, in_tokens, out_tokens, cost_usd,
+                capability_class, vendor, in_tokens, out_tokens,
+                cache_read_tokens, cache_write_tokens, cost_usd,
                 calls, repo_name, worktree_name, branch, cwd_raw, label_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (session_id, model_sku) DO UPDATE SET
                 model_version = excluded.model_version,
                 ts = excluded.ts,
@@ -112,6 +134,8 @@ def upsert(db_path: Path, record: CallRecord) -> None:
                 vendor = excluded.vendor,
                 in_tokens = excluded.in_tokens,
                 out_tokens = excluded.out_tokens,
+                cache_read_tokens = excluded.cache_read_tokens,
+                cache_write_tokens = excluded.cache_write_tokens,
                 cost_usd = excluded.cost_usd,
                 calls = excluded.calls,
                 repo_name = excluded.repo_name,
@@ -130,6 +154,8 @@ def upsert(db_path: Path, record: CallRecord) -> None:
                 record.vendor,
                 record.in_tokens,
                 record.out_tokens,
+                record.cache_read_tokens,
+                record.cache_write_tokens,
                 record.cost_usd,
                 record.calls,
                 record.repo_name,
@@ -150,7 +176,8 @@ def all_records(db_path: Path) -> list[CallRecord]:
         rows = connection.execute(
             """
             SELECT model_version, ts, session_id, project, model_sku,
-                   capability_class, vendor, in_tokens, out_tokens, cost_usd,
+                   capability_class, vendor, in_tokens, out_tokens,
+                   cache_read_tokens, cache_write_tokens, cost_usd,
                    calls, repo_name, worktree_name, branch, cwd_raw,
                    label_source
             FROM call_records

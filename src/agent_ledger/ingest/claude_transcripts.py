@@ -46,6 +46,8 @@ class Bucket:
     cwd_raw: str | None = None
     in_tokens: int = 0
     out_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     calls: int = 0
     last_ts: str = ""
 
@@ -206,8 +208,16 @@ def parse_transcript(
         )
         if cwd_raw:
             bucket.cwd_raw = cwd_raw
+        # `cache_read_input_tokens` was dropped entirely before v3. On a
+        # harness that re-sends a large cached prefix on every call it is the
+        # dominant stream, so both volume and cost were understated without
+        # any signal that they were. It is tracked as its own field rather
+        # than folded into `in_tokens`, which must keep its v1/v2 meaning.
+        cache_write_tokens = _token_count(usage.get("cache_creation_input_tokens"))
         bucket.in_tokens += _token_count(usage.get("input_tokens"))
-        bucket.in_tokens += _token_count(usage.get("cache_creation_input_tokens"))
+        bucket.in_tokens += cache_write_tokens
+        bucket.cache_write_tokens += cache_write_tokens
+        bucket.cache_read_tokens += _token_count(usage.get("cache_read_input_tokens"))
         bucket.out_tokens += _token_count(usage.get("output_tokens"))
         bucket.calls += 1
         timestamp = str(record.get("timestamp") or "")
@@ -230,7 +240,16 @@ def parse_transcript(
                 vendor=vendor,
                 in_tokens=bucket.in_tokens,
                 out_tokens=bucket.out_tokens,
-                cost_usd=cost_usd(model, bucket.in_tokens, bucket.out_tokens, prices),
+                cache_read_tokens=bucket.cache_read_tokens,
+                cache_write_tokens=bucket.cache_write_tokens,
+                cost_usd=cost_usd(
+                    model,
+                    bucket.in_tokens,
+                    bucket.out_tokens,
+                    prices,
+                    cache_read_tokens=bucket.cache_read_tokens,
+                    cache_write_tokens=bucket.cache_write_tokens,
+                ),
                 calls=bucket.calls,
                 repo_name=bucket.repo_name,
                 worktree_name=bucket.worktree_name,
