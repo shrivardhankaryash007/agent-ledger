@@ -149,12 +149,14 @@ def test_cost_math_is_nonnegative_and_additive(
 ) -> None:
     path = tmp_path / "project" / "session.jsonl"
     path.parent.mkdir(exist_ok=True)
+    model = _priced_model("sonnet")
+    price = pricing_module.load_pricing()[model]
     calls = [
         {
             "sessionId": "session",
             "timestamp": "2026-01-01T00:00:00Z",
             "message": {
-                "model": _priced_model("sonnet"),
+                "model": model,
                 "usage": {"input_tokens": in_tokens, "output_tokens": out_tokens},
             },
         }
@@ -166,9 +168,11 @@ def test_cost_math_is_nonnegative_and_additive(
     path.write_text("\n".join(json.dumps(call) for call in calls), encoding="utf-8")
 
     record = parse_transcript(path)[0]
-    expected = (first_in + second_in) / 1000 * 0.003 + (
+    # Rates come from the live table so a price refresh cannot break the test;
+    # the property under test is additivity, not any particular price.
+    expected = (first_in + second_in) / 1000 * price.input_rate + (
         first_out + second_out
-    ) / 1000 * 0.015
+    ) / 1000 * price.output_rate
 
     assert record.cost_usd >= 0
     assert record.cost_usd == pytest.approx(expected)

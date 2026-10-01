@@ -1,5 +1,5 @@
 # Versioned pricing table (USD per 1k tokens). Source: ~/dev/standards/agentic-os/MODEL-PRICING.md,
-# verified 2026-08-02 against the Claude API pricing table (claude-api skill).
+# verified 2026-10-01 against https://platform.claude.com/docs/en/about-claude/pricing.
 # Update whenever that file updates; do not let the two drift. Standard
 # sticker rates only (no promotional/intro pricing) to avoid silent drift
 # when a promo window expires.
@@ -11,11 +11,18 @@
 # them explicitly only for a SKU whose cache rates diverge from those ratios.
 version: 3
 skus:
+  # cache_read diverges from the 0.1x default on the two newest SKUs
+  # (Fable 5.1 = 0.025x, Opus 5.5 = 0.05x of input; cache writes stay 1.25x).
+  claude-fable-5-1: { input: 0.010, output: 0.050, cache_read: 0.00025, vendor: anthropic }
   claude-fable-5: { input: 0.010, output: 0.050, vendor: anthropic }
+  claude-opus-5-5: { input: 0.004, output: 0.020, cache_read: 0.0002, vendor: anthropic }
   claude-opus-5: { input: 0.005, output: 0.025, vendor: anthropic }
   claude-opus-4-8: { input: 0.005, output: 0.025, vendor: anthropic }
   claude-opus-4-7: { input: 0.005, output: 0.025, vendor: anthropic }
-  claude-sonnet-5: { input: 0.003, output: 0.015, vendor: anthropic }
+  claude-sonnet-5-5: { input: 0.002, output: 0.010, vendor: anthropic }
+  # Sonnet 5 $2/$10 became the standard price (the planned 2026-09-01 rise to
+  # $3/$15 was cancelled); rows before 2026-10-01 carried the wrong $3/$15.
+  claude-sonnet-5: { input: 0.002, output: 0.010, vendor: anthropic }
   claude-sonnet-4-6: { input: 0.003, output: 0.015, vendor: anthropic }
   claude-haiku-4-5: { input: 0.001, output: 0.005, vendor: anthropic }
   claude-haiku-4-5-20251001: { input: 0.001, output: 0.005, vendor: anthropic }
