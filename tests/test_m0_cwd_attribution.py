@@ -28,6 +28,7 @@ since that fixture has no `cwd` field at all).
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from agent_ledger.ingest.claude_transcripts import ingest
@@ -35,11 +36,54 @@ from agent_ledger.report.spend import per_project
 
 FIXTURES = Path(__file__).parent / "fixtures" / "claude_projects_cwd"
 
+# The fixture was recorded against the owner's real directories. Attribution
+# now resolves each cwd through git (ADR 0005), so on any machine without those
+# paths — CI — both cwds fall through to "not a repo" and collapse into one
+# bucket. The test rebuilds the same two repos under tmp_path and rewrites the
+# fixture's cwd values to point at them, keeping the recorded shape hermetic.
+_RECORDED_ROOT = "/Users/yashshrivardhankar/dev"
+
+
+def _init_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    for args in (
+        ["init", "-q", "-b", "main"],
+        [
+            "-c",
+            "user.email=t@t",
+            "-c",
+            "user.name=t",
+            "commit",
+            "-q",
+            "--allow-empty",
+            "-m",
+            "init",
+        ],
+    ):
+        subprocess.run(["git", *args], cwd=path, check=True, capture_output=True)
+
+
+def _hermetic_corpus(tmp_path: Path) -> Path:
+    """Copy the recorded fixture, pointing its cwd values at real tmp repos."""
+
+    dev = tmp_path / "dev"
+    _init_repo(dev)
+    _init_repo(dev / "careledger")
+    corpus = tmp_path / "corpus"
+    for source in FIXTURES.rglob("*.jsonl"):
+        target = corpus / source.relative_to(FIXTURES)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            source.read_text(encoding="utf-8").replace(_RECORDED_ROOT, str(dev)),
+            encoding="utf-8",
+        )
+    return corpus
+
 
 def test_mixed_cwd_session_splits_by_actual_project(tmp_path: Path) -> None:
     db_path = tmp_path / "ledger.db"
 
-    written = ingest(FIXTURES, db_path)
+    written = ingest(_hermetic_corpus(tmp_path), db_path)
     # One CallRecord per (session, model, cwd-derived-project): "dev" and
     # "careledger" are different projects even though they share one
     # transcript file and one sessionId.
