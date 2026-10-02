@@ -10,6 +10,15 @@ real corpus: launch directory, not working repo. `source_dir`'s per-project
 directory layout is still how transcripts are discovered on disk; it plays
 no part in attribution anymore.
 
+Usage de-duplication (ADR 0007): Claude Code writes one API response as
+several JSONL lines — one per content block — that share `message.id` and
+repeat the response's `usage`. A response is therefore counted **once**, from
+its *last* line (the first line holds a partial streaming `output_tokens`).
+Consequently `CallRecord.calls` means "API responses", not "transcript lines".
+Lines with no `message.id` cannot be merged safely and are each counted.
+De-duplication is per transcript file; the same response can still appear in
+two files (a resumed or forked session replays history) — see ADR 0007.
+
 Independent of `~/dev/scripts/token_ledger.py` / `ide_meter.py` by design —
 see AGENTS.md rule 2. Parse/classify logic may be *read* from those files as
 reference; this module must not import or modify them.
@@ -48,7 +57,7 @@ class Bucket:
     out_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
-    calls: int = 0
+    calls: int = 0  # distinct API responses (message.id), not transcript lines
     last_ts: str = ""
 
 
@@ -132,6 +141,65 @@ def iter_transcript_lines(
         yield cast("dict[object, object]", decoded)
 
 
+@dataclass
+class _UsageLine:
+    """One API response's usage, as read from its last transcript line."""
+
+    model: str
+    usage: dict[object, object]
+    session_id: str
+    cwd_raw: str | None
+    timestamp: str
+
+
+def _usage_lines(path: Path) -> list[_UsageLine]:
+    """Return one `_UsageLine` per API response in ``path``, in first-seen order.
+
+    Lines sharing a `message.id` collapse to the **last** such line, whose
+    `usage` is final; a later line also replaces the model/cwd of an earlier
+    one. The surviving timestamp is the latest across the merged lines, so a
+    row's `ts` is unchanged by de-duplication. Lines without a usable
+    `message.id` are kept individually.
+    """
+
+    entries: list[_UsageLine] = []
+    index_by_id: dict[str, int] = {}
+    for record in iter_transcript_lines(path):
+        message_value = record.get("message")
+        if not isinstance(message_value, dict):
+            continue
+        message = cast("dict[object, object]", message_value)
+        model = message.get("model")
+        usage_value = message.get("usage")
+        if (
+            not isinstance(model, str)
+            or not model
+            or model == SYNTHETIC_MODEL
+            or not isinstance(usage_value, dict)
+        ):
+            continue
+        cwd_value = record.get("cwd")
+        entry = _UsageLine(
+            model=model,
+            usage=cast("dict[object, object]", usage_value),
+            session_id=str(record.get("sessionId") or path.stem),
+            cwd_raw=cwd_value if isinstance(cwd_value, str) and cwd_value else None,
+            timestamp=str(record.get("timestamp") or ""),
+        )
+        message_id = message.get("id")
+        if not isinstance(message_id, str) or not message_id:
+            entries.append(entry)
+            continue
+        seen_at = index_by_id.get(message_id)
+        if seen_at is None:
+            index_by_id[message_id] = len(entries)
+            entries.append(entry)
+            continue
+        entry.timestamp = max(entry.timestamp, entries[seen_at].timestamp)
+        entries[seen_at] = entry
+    return entries
+
+
 def _bucket_tag(label: GitLabel) -> str:
     """Short human string identifying a bucket's attribution, for session_id
     disambiguation only — never stored as ``project`` directly."""
@@ -147,7 +215,7 @@ def parse_transcript(
     path: Path, *, git_cache: dict[str, GitLabel] | None = None
 ) -> list[CallRecord]:
     """Aggregate one transcript into per-model records with git-resolved
-    attribution.
+    attribution, counting each API response (`message.id`) once.
 
     Args:
         path: Transcript JSONL file.
@@ -155,6 +223,17 @@ def parse_transcript(
             run — most consecutive lines in a session share one cwd, and
             each resolution costs three `git` subprocess calls, so reusing
             results across files matters at real transcript volume.
+
+    Returns:
+        One `CallRecord` per (model, repo, worktree, label) bucket. `calls`
+        is the number of distinct API responses in the bucket.
+
+    Raises:
+        ValueError: A transcript model has no configured pricing.
+
+    Example:
+        Three content-block lines of one response yield ``calls == 1`` and the
+        usage of the last line, not three times it.
     """
 
     cache: dict[str, GitLabel] = git_cache if git_cache is not None else {}
@@ -169,25 +248,13 @@ def parse_transcript(
         return cached
 
     buckets: dict[tuple[str, str | None, str | None, LabelSource], Bucket] = {}
-    for record in iter_transcript_lines(path):
-        message_value = record.get("message")
-        if not isinstance(message_value, dict):
-            continue
-        message = cast("dict[object, object]", message_value)
-        model = message.get("model")
-        usage_value = message.get("usage")
-        if (
-            not isinstance(model, str)
-            or not model
-            or model == SYNTHETIC_MODEL
-            or not isinstance(usage_value, dict)
-        ):
-            continue
-        usage = cast("dict[object, object]", usage_value)
-        session_id = str(record.get("sessionId") or path.stem)
-
-        cwd_value = record.get("cwd")
-        cwd_raw = cwd_value if isinstance(cwd_value, str) and cwd_value else None
+    for line in _usage_lines(path):
+        model, usage, session_id, cwd_raw = (
+            line.model,
+            line.usage,
+            line.session_id,
+            line.cwd_raw,
+        )
         label = resolve_cached(cwd_raw)
 
         project = label.repo_name if label.label_source == "git" else None
@@ -220,9 +287,8 @@ def parse_transcript(
         bucket.cache_read_tokens += _token_count(usage.get("cache_read_input_tokens"))
         bucket.out_tokens += _token_count(usage.get("output_tokens"))
         bucket.calls += 1
-        timestamp = str(record.get("timestamp") or "")
-        if timestamp > bucket.last_ts:
-            bucket.last_ts = timestamp
+        if line.timestamp > bucket.last_ts:
+            bucket.last_ts = line.timestamp
 
     prices = load_pricing()
     records: list[CallRecord] = []

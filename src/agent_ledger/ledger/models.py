@@ -8,7 +8,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, NonNegativeInt
 
-MODEL_VERSION = 3
+# v4 (2026-10-02, ADR 0007): no column changes. Marks rows whose usage was
+# de-duplicated by `message.id`. Any row with model_version < 4 was summed per
+# transcript *line* and is overstated ~2.2x (cost) where its transcript no
+# longer exists to be re-ingested.
+MODEL_VERSION = 4
 
 # 'git': repo_name resolved via git. 'not_a_repo': cwd_raw resolved to a real
 # path that git rejected. 'unknown': no cwd was available to resolve, or a
@@ -42,6 +46,10 @@ class CallRecord(BaseModel):
     intentional: collapsing it would silently change what ``in_tokens`` means
     across the version boundary, which AGENTS.md rule 1 exists to prevent.
     Both default to ``0``, meaning "not measured" on pre-v3 rows.
+
+    ``calls`` is the number of distinct API responses in the bucket. Before
+    v4 the transcript source counted *lines*, and one response spans several
+    lines (ADR 0007), so pre-v4 ``calls`` and token/cost totals are inflated.
     """
 
     model_version: int = MODEL_VERSION
