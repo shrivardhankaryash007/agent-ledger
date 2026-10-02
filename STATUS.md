@@ -1,16 +1,18 @@
 # agent-ledger Status
 
 Last updated: 2026-10-02 (ADR 0007 — usage de-duplicated by `message.id`;
-branch `fix/dedupe-usage-by-message-id`, not merged, not pushed)
+LIVE on local `main`, production DB re-ingested; not pushed)
 
 ## Current Baseline
 
-- **Cost was overstated ~2.2x by per-line usage summing — fixed on a branch,
-  production DB NOT yet re-ingested** (2026-10-02, ADR 0007, `MODEL_VERSION`
-  4). One API response spans several transcript lines sharing a `message.id`;
+- **Cost was overstated ~2.2x by per-line usage summing — fixed and live**
+  (2026-10-02, ADR 0007, `MODEL_VERSION` 4; merged to local `main`, production
+  `data/ledger.db` re-ingested after a backup,
+  `data/ledger.db.pre-dedupe-2026-10-02.bak`; the nightly launchd ingest now
+  runs the fixed code). Live total moved $2,923.71 -> $2,504.79 (443 rows). One API response spans several transcript lines sharing a `message.id`;
   every line was added. Full corpus: line-sum $1,013.62 vs de-duplicated
-  $456.31 (2.22x; 2.13–2.36x in each month). On a *copy* of `data/ledger.db`
-  the recorded total moves $2,931.17 → $2,499.33 (−14.7%) because 310 rows
+  $456.31 (2.22x; 2.13–2.36x in each month). The like-for-like
+  change on identical input was $2,931.17 → $2,499.33 (−14.7%); it is not larger because 310 rows
   ($2,162.20, `model_version` < 4) have no surviving transcript and stay
   overstated. **Treat any pre-v4 Claude Code figure as an upper bound,
   including the `$1,596.36` / `$2,570.83` totals quoted below and in ADR

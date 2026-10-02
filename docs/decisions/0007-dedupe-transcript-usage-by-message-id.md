@@ -1,6 +1,6 @@
 # 0007 — Count each API response once: de-duplicate transcript usage by `message.id`
 
-- **Status:** Proposed (implemented on branch `fix/dedupe-usage-by-message-id`, not pushed)
+- **Status:** Accepted — owner directed it be landed (2026-10-02); merged to local `main`, production DB re-ingested, not pushed
 - **Date:** 2026-10-02
 - **Supersedes:** none
 - **Amends:** the meaning of `CallRecord.calls` and of every stored token/cost
@@ -100,6 +100,7 @@ corpus; first-wins understates output by 2.0% (4,166,819 vs 4,249,724).
 - `report/spend.py` and `policy/replay.py` need no code change; the M2
   counterfactual ceiling (`$295.12` of `$544.18`) was computed on the inflated
   base and should be re-run before it is quoted again.
+- **Landed 2026-10-02:** live `data/ledger.db` (backup kept beside it) re-ingested by the same command launchd runs: 433 rows $2,923.71 → 443 rows $2,504.79 (v4: 133 rows $342.59; stale v1-v3: 310 rows $2,162.20). A repeat run drifted +$0.10 only because the running session's own transcript was still growing.
 - Re-ingest idempotency verified on the copy: three consecutive runs produced
   identical row counts, totals and a hash over every stored row.
 
