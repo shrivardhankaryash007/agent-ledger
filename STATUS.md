@@ -1,9 +1,11 @@
 # agent-ledger Status
 
-Last updated: 2026-10-02 (ADR 0007 — usage de-duplicated by `message.id`;
-LIVE on local `main`, production DB re-ingested; not pushed)
+Last updated: 2026-10-04 (ADR 0059 — model catalog authority sync;
+OpenAI and Google rates added, 25/25 tests pass; committed `ac72aca`)
 
 ## Current Baseline
+
+- **Model catalog pricing synchronized from workspace authority** (2026-10-04, commit `ac72aca`, ADR 0059): `src/agent_ledger/ledger/pricing.yaml` is now generated from `standards/agentic-os/model-catalog.json` via `python3 scripts/model_catalog.py ledger-sync --write`. Added OpenAI and Google models alongside Anthropic, preserving historical cache ratios and local zero-cost rows. 25/25 unit and cache-token tests pass.
 
 - **Cost was overstated ~2.2x by per-line usage summing — fixed and live**
   (2026-10-02, ADR 0007, `MODEL_VERSION` 4; merged to local `main`, production
