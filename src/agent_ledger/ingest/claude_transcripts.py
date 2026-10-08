@@ -19,6 +19,11 @@ Lines with no `message.id` cannot be merged safely and are each counted.
 De-duplication is per transcript file; the same response can still appear in
 two files (a resumed or forked session replays history) — see ADR 0007.
 
+Subagent transcripts (ADR 0008): a file under a `subagents/` directory stamps
+every line with its PARENT's `sessionId`. Its rows therefore get a per-file
+key suffix, or they would overwrite the parent's rows on upsert. Ordinary
+transcripts keep their existing keys.
+
 Independent of `~/dev/scripts/token_ledger.py` / `ide_meter.py` by design —
 see AGENTS.md rule 2. Parse/classify logic may be *read* from those files as
 reference; this module must not import or modify them.
@@ -40,6 +45,7 @@ from agent_ledger.ledger.repository import migrate, upsert
 
 SYNTHETIC_MODEL = "<synthetic>"
 UNKNOWN_PROJECT = "unknown"
+SUBAGENT_DIR = "subagents"
 
 
 @dataclass
@@ -211,6 +217,27 @@ def _bucket_tag(label: GitLabel) -> str:
     return label.repo_name
 
 
+def _session_suffix(path: Path) -> str:
+    """Return the session-key suffix that keeps subagent rows off the parent's.
+
+    A subagent transcript sits at ``<project>/<session>/subagents/agent-<id>.jsonl``
+    and every line carries the PARENT's ``sessionId``. Keyed by ``sessionId``
+    alone, its rows overwrite the parent's on upsert (ADR 0008). The file stem is
+    unique within a session, so it disambiguates each subagent. Ordinary
+    transcripts get no suffix, so their existing keys do not change.
+
+    Args:
+        path: Local transcript JSONL path.
+
+    Returns:
+        ``":subagent:<file stem>"`` for a subagent transcript, otherwise ``""``.
+    """
+
+    if path.parent.name == SUBAGENT_DIR:
+        return f":subagent:{path.stem}"
+    return ""
+
+
 def parse_transcript(
     path: Path, *, git_cache: dict[str, GitLabel] | None = None
 ) -> list[CallRecord]:
@@ -237,6 +264,7 @@ def parse_transcript(
     """
 
     cache: dict[str, GitLabel] = git_cache if git_cache is not None else {}
+    suffix = _session_suffix(path)
 
     def resolve_cached(cwd: str | None) -> GitLabel:
         if not cwd:
@@ -259,7 +287,7 @@ def parse_transcript(
 
         project = label.repo_name if label.label_source == "git" else None
         project = project or UNKNOWN_PROJECT
-        bucket_session_id = f"{session_id}:{_bucket_tag(label)}"
+        bucket_session_id = f"{session_id}:{_bucket_tag(label)}{suffix}"
 
         key = (model, label.repo_name, label.worktree_name, label.label_source)
         bucket = buckets.setdefault(

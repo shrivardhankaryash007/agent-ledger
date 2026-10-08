@@ -1,9 +1,20 @@
 # agent-ledger Status
 
-Last updated: 2026-10-04 (ADR 0059 — model catalog authority sync;
-OpenAI and Google rates added, 25/25 tests pass; committed `ac72aca`)
+Last updated: 2026-10-08 (ADR 0008 subagent row keys, long-prompt pricing tiers,
+`report --by model`; 136 tests pass)
 
 ## Current Baseline
+
+- **Subagent spend now reaches the ledger** (2026-10-08, ADR 0008, closes ADR 0007
+  follow-up #1): subagent transcript files get a `:subagent:<file stem>` suffix on
+  their row key, so they no longer overwrite the parent. Measured on copies of the
+  real ledger and transcripts: +$128.62, equal to the 36 subagent rows ($128.63), no
+  double count. The nightly `ingest` recovers it; no schema change, `MODEL_VERSION`
+  stays 4. Also new: **long-prompt pricing tiers** (`pricing.yaml` keys
+  `long_prompt_threshold`, `long_input`, `long_output`, optional `long_cache_*`;
+  needed for Claude Haiku 5.5, which bills 5x above 100K prompt tokens) and
+  `agent-ledger report --by model`. Built by Claude Haiku 5.5 and Luna from planner
+  packets as a bake-off (`~/dev/plans/innovation-framework/research/packets/HAIKU-BAKEOFF-LOG.md`).
 
 - **Model catalog pricing synchronized from workspace authority** (2026-10-04, commit `ac72aca`, ADR 0059): `src/agent_ledger/ledger/pricing.yaml` is now generated from `standards/agentic-os/model-catalog.json` via `python3 scripts/model_catalog.py ledger-sync --write`. Added OpenAI and Google models alongside Anthropic, preserving historical cache ratios and local zero-cost rows. 25/25 unit and cache-token tests pass.
 

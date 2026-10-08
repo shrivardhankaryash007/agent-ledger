@@ -108,7 +108,7 @@ corpus; first-wins understates output by 2.0% (4,166,819 vs 4,249,724).
 
 | # | Finding | Size | Why not folded in |
 |---|---|---|---|
-| 1 | **Row-key collision silently drops spend.** Subagent transcripts carry the *parent's* `sessionId`, so several files yield the same `(session_id, model_sku)` and `upsert` overwrites — last file wins, no addition. | After this fix: $458.40 produced, $337.14 stored → **$121.27 (26%) lost** across 5 keys | Changes row identity (the primary key); needs its own ADR and a migration plan. It is now the largest remaining error in the Claude Code path, and it errs low. |
+| 1 | **(Closed 2026-10-08 by ADR 0008.) Row-key collision silently drops spend.** Subagent transcripts carry the *parent's* `sessionId`, so several files yield the same `(session_id, model_sku)` and `upsert` overwrites — last file wins, no addition. | After this fix: $458.40 produced, $337.14 stored → **$121.27 (26%) lost** across 5 keys | Changes row identity (the primary key); needs its own ADR and a migration plan. It is now the largest remaining error in the Claude Code path, and it errs low. |
 | 2 | **Cross-file duplicate responses.** 145 `message.id`s appear in two non-subagent files with different `sessionId`s (resumed/forked sessions replay history). Per-file de-dup cannot see them. | $10.39 (2.3%) | Needs a corpus-wide pass in `ingest()`, interacts with #1. |
 | 3 | Reports do not yet surface `model_version < 4` as unverified. | — | Presentation change, own packet. |
 

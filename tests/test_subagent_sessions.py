@@ -1,4 +1,4 @@
-"""Packet AL-D acceptance: subagent transcripts must not overwrite their parent (red first).
+"""Packet AL-D acceptance: subagent transcripts must not overwrite the parent.
 
 Facts (ADR 0007 follow-up #1, STATUS.md): Claude Code writes a subagent's
 transcript to ``<project>/<session>/subagents/agent-<id>.jsonl`` and every line
@@ -42,11 +42,15 @@ def _line(message_id: str, in_tokens: int, out_tokens: int) -> str:
 def _source(tmp_path: Path, *, with_subagent: bool = True) -> Path:
     project = tmp_path / "projects" / "-proj"
     project.mkdir(parents=True)
-    (project / f"{PARENT_ID}.jsonl").write_text(_line("msg_parent", 100, 10) + "\n", "utf-8")
+    (project / f"{PARENT_ID}.jsonl").write_text(
+        _line("msg_parent", 100, 10) + "\n", "utf-8"
+    )
     if with_subagent:
         sub = project / PARENT_ID / "subagents"
         sub.mkdir(parents=True)
-        (sub / "agent-abc123.jsonl").write_text(_line("msg_sub", 200, 20) + "\n", "utf-8")
+        (sub / "agent-abc123.jsonl").write_text(
+            _line("msg_sub", 200, 20) + "\n", "utf-8"
+        )
     return tmp_path / "projects"
 
 
@@ -67,9 +71,13 @@ def test_reingesting_changes_nothing(tmp_path: Path) -> None:
     db = tmp_path / "ledger.db"
     source = _source(tmp_path)
     ingest(source, db)
-    first = sorted((r.session_id, r.model_sku, r.in_tokens, r.calls) for r in all_records(db))
+    first = sorted(
+        (r.session_id, r.model_sku, r.in_tokens, r.calls) for r in all_records(db)
+    )
     ingest(source, db)
-    second = sorted((r.session_id, r.model_sku, r.in_tokens, r.calls) for r in all_records(db))
+    second = sorted(
+        (r.session_id, r.model_sku, r.in_tokens, r.calls) for r in all_records(db)
+    )
     assert first == second
 
 
