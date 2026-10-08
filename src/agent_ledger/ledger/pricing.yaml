@@ -46,3 +46,4 @@ skus:
   gpt-oss:20b: { input: 0, output: 0, vendor: ollama }
   gemma4:latest: { input: 0, output: 0, vendor: ollama }
   nomic-embed-text:latest: { input: 0, output: 0, vendor: ollama }
+  claude-haiku-5-5: { input: 0.0001, output: 0.0005, cache_read: 1e-05, cache_write: 0.000125, vendor: anthropic }
