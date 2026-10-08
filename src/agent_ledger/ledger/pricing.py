@@ -28,6 +28,127 @@ class Price:
     output_rate: float
     cache_read_rate: float = 0.0
     cache_write_rate: float = 0.0
+    long_prompt_threshold: int | None = None
+    long_input_rate: float | None = None
+    long_output_rate: float | None = None
+    long_cache_read_rate: float | None = None
+    long_cache_write_rate: float | None = None
+
+
+_Tier = tuple[int | None, float | None, float | None, float | None, float | None]
+
+
+def _tier_rate(model: str, key: str, value: object) -> float:
+    """Coerce one long-prompt tier rate to ``float``.
+
+    Args:
+        model: Pricing-table key, used in the error message.
+        key: The YAML key being read, used in the error message.
+        value: The raw value from ``pricing.yaml``.
+
+    Returns:
+        The rate as a float.
+
+    Raises:
+        ValueError: If ``value`` is not a real number.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(
+            f"pricing entry for {model!r} has an invalid tier value for {key!r}"
+        )
+    return float(value)
+
+
+def _load_tier(model: str, rates: dict[object, object]) -> _Tier:
+    """Read one SKU's optional long-prompt tier.
+
+    ``long_prompt_threshold``, ``long_input`` and ``long_output`` must appear
+    together or not at all. The cache rates are optional; when omitted they
+    follow the same multipliers as the base cache rates.
+
+    Args:
+        model: Pricing-table key, used in error messages.
+        rates: The raw mapping for this SKU from ``pricing.yaml``.
+
+    Returns:
+        ``(threshold, input, output, cache_read, cache_write)``, all ``None``
+        when the SKU has no tier.
+
+    Raises:
+        ValueError: If the tier is partially specified or a tier value is invalid.
+    """
+    threshold_raw = rates.get("long_prompt_threshold")
+    input_raw = rates.get("long_input")
+    output_raw = rates.get("long_output")
+    cache_read_raw = rates.get("long_cache_read")
+    cache_write_raw = rates.get("long_cache_write")
+    if threshold_raw is None or input_raw is None or output_raw is None:
+        partial_values = (
+            threshold_raw,
+            input_raw,
+            output_raw,
+            cache_read_raw,
+            cache_write_raw,
+        )
+        if any(value is not None for value in partial_values):
+            raise ValueError(
+                f"pricing entry for {model!r} has an incomplete tier: "
+                "long_prompt_threshold, long_input and long_output must all be set"
+            )
+        return None, None, None, None, None
+    if isinstance(threshold_raw, bool) or not isinstance(threshold_raw, int):
+        raise ValueError(f"pricing entry for {model!r} has an invalid tier threshold")
+    long_input = _tier_rate(model, "long_input", input_raw)
+    long_output = _tier_rate(model, "long_output", output_raw)
+    long_cache_read = (
+        _tier_rate(model, "long_cache_read", cache_read_raw)
+        if cache_read_raw is not None
+        else long_input * CACHE_READ_MULTIPLIER
+    )
+    long_cache_write = (
+        _tier_rate(model, "long_cache_write", cache_write_raw)
+        if cache_write_raw is not None
+        else long_input * CACHE_WRITE_MULTIPLIER
+    )
+    return threshold_raw, long_input, long_output, long_cache_read, long_cache_write
+
+
+def _rates_for_prompt(
+    price: Price, prompt_tokens: int
+) -> tuple[float, float, float, float]:
+    """Select the base or long-prompt rates for one call.
+
+    The long tier applies only when ``prompt_tokens`` is strictly above the
+    SKU's threshold and all four long rates are set. Otherwise the base rates
+    are returned, exactly as before tiers existed.
+
+    Args:
+        price: The model's price entry.
+        prompt_tokens: Prompt size, ``in_tokens + cache_read_tokens``.
+
+    Returns:
+        ``(input, output, cache_read, cache_write)`` rates per thousand tokens.
+    """
+    threshold = price.long_prompt_threshold
+    long_input = price.long_input_rate
+    long_output = price.long_output_rate
+    long_cache_read = price.long_cache_read_rate
+    long_cache_write = price.long_cache_write_rate
+    if (
+        threshold is not None
+        and prompt_tokens > threshold
+        and long_input is not None
+        and long_output is not None
+        and long_cache_read is not None
+        and long_cache_write is not None
+    ):
+        return long_input, long_output, long_cache_read, long_cache_write
+    return (
+        price.input_rate,
+        price.output_rate,
+        price.cache_read_rate,
+        price.cache_write_rate,
+    )
 
 
 def load_pricing() -> dict[str, Price]:
@@ -58,6 +179,13 @@ def load_pricing() -> dict[str, Price]:
             raise ValueError(f"pricing entry for {model!r} has an invalid cache_read")
         if cache_write is not None and not isinstance(cache_write, (int, float)):
             raise ValueError(f"pricing entry for {model!r} has an invalid cache_write")
+        (
+            long_threshold,
+            long_input,
+            long_output,
+            long_cache_read,
+            long_cache_write,
+        ) = _load_tier(model, rates)
         prices[model] = Price(
             input_rate=float(input_rate),
             output_rate=float(output_rate),
@@ -71,6 +199,11 @@ def load_pricing() -> dict[str, Price]:
                 if cache_write is not None
                 else float(input_rate) * CACHE_WRITE_MULTIPLIER
             ),
+            long_prompt_threshold=long_threshold,
+            long_input_rate=long_input,
+            long_output_rate=long_output,
+            long_cache_read_rate=long_cache_read,
+            long_cache_write_rate=long_cache_write,
         )
     return prices
 
@@ -120,9 +253,12 @@ def cost_usd(
 
     price = prices[model]
     fresh_in_tokens = max(in_tokens - cache_write_tokens, 0)
+    input_rate, output_rate, cache_read_rate, cache_write_rate = _rates_for_prompt(
+        price, in_tokens + cache_read_tokens
+    )
     return (
-        fresh_in_tokens / 1000 * price.input_rate
-        + cache_write_tokens / 1000 * price.cache_write_rate
-        + cache_read_tokens / 1000 * price.cache_read_rate
-        + out_tokens / 1000 * price.output_rate
+        fresh_in_tokens / 1000 * input_rate
+        + cache_write_tokens / 1000 * cache_write_rate
+        + cache_read_tokens / 1000 * cache_read_rate
+        + out_tokens / 1000 * output_rate
     )
