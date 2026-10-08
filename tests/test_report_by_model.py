@@ -26,7 +26,9 @@ COLUMNS = [
 ]
 
 
-def _record(session: str, model: str, vendor: str, cost: float, **tokens: int) -> CallRecord:
+def _record(
+    session: str, model: str, vendor: str, cost: float, **tokens: int
+) -> CallRecord:
     return CallRecord(
         ts=datetime(2026, 10, 1, tzinfo=UTC),
         session_id=session,
@@ -46,8 +48,16 @@ def _record(session: str, model: str, vendor: str, cost: float, **tokens: int) -
 def _db(tmp_path: Path) -> Path:
     db = tmp_path / "ledger.db"
     migrate(db)
-    upsert(db, _record("s1", "model-a", "anthropic", 1.0, in_tokens=100, out_tokens=10, calls=2))
-    upsert(db, _record("s2", "model-a", "anthropic", 2.0, in_tokens=200, cache_read_tokens=50))
+    upsert(
+        db,
+        _record(
+            "s1", "model-a", "anthropic", 1.0, in_tokens=100, out_tokens=10, calls=2
+        ),
+    )
+    upsert(
+        db,
+        _record("s2", "model-a", "anthropic", 2.0, in_tokens=200, cache_read_tokens=50),
+    )
     upsert(db, _record("s3", "model-b", "anthropic", 9.0, cache_write_tokens=7))
     upsert(db, _record("s4", "model-c", "openai", 0.5))
     upsert(db, _record("s5", "model-c", "other", 0.5))
@@ -63,14 +73,17 @@ def test_per_model_groups_sums_and_orders_by_cost_then_name(tmp_path: Path) -> N
     assert a["in_tokens"] == 300 and a["out_tokens"] == 15 and a["calls"] == 3
     assert a["cache_read_tokens"] == 50
     assert a["cost_usd"] == 3.0
-    # The same model under two vendors stays two rows; ties on cost sort by model, then vendor.
+    # The same model under two vendors stays two rows;
+    # ties on cost sort by model, then vendor.
     assert frame.filter(pl.col("model_sku") == "model-c")["vendor"].to_list() == [
         "openai",
         "other",
     ]
 
 
-def test_per_model_on_an_empty_ledger_has_the_columns_and_no_rows(tmp_path: Path) -> None:
+def test_per_model_on_an_empty_ledger_has_the_columns_and_no_rows(
+    tmp_path: Path,
+) -> None:
     db = tmp_path / "empty.db"
     migrate(db)
     frame = per_model(db)
@@ -78,7 +91,9 @@ def test_per_model_on_an_empty_ledger_has_the_columns_and_no_rows(tmp_path: Path
 
 
 def test_cli_report_by_model_prints_models_not_projects(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["report", "--by", "model", "--db-path", str(_db(tmp_path))])
+    result = runner.invoke(
+        app, ["report", "--by", "model", "--db-path", str(_db(tmp_path))]
+    )
     assert result.exit_code == 0
     assert "model-a" in result.output and "model_sku" in result.output
     assert "proj" not in result.output
@@ -91,6 +106,8 @@ def test_cli_report_default_is_still_by_project(tmp_path: Path) -> None:
 
 
 def test_cli_report_rejects_an_unknown_grouping(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["report", "--by", "nonsense", "--db-path", str(_db(tmp_path))])
+    result = runner.invoke(
+        app, ["report", "--by", "nonsense", "--db-path", str(_db(tmp_path))]
+    )
     assert result.exit_code == 2
     assert "--by" in result.output

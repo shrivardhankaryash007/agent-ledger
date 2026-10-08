@@ -40,7 +40,7 @@ from agent_ledger.recovery.package import (
 )
 from agent_ledger.recovery.prompt import render_recovery_prompt
 from agent_ledger.recovery.receipts import ReceiptStore, run_verification
-from agent_ledger.report.spend import per_project
+from agent_ledger.report.spend import per_model, per_project
 from agent_ledger.resume.detector import detect_ending
 from agent_ledger.resume.extractor import extract_packet
 from agent_ledger.resume.models import SessionEnding
@@ -189,10 +189,15 @@ def ingest(
 
 
 @app.command()
-def report(db_path: Path = DEFAULT_DB_PATH) -> None:
-    """Print per-project spend."""
+def report(db_path: Path = DEFAULT_DB_PATH, by: str = "project") -> None:
+    """Print spend grouped by project or model."""
 
-    frame = per_project(db_path)
+    if by == "project":
+        frame = per_project(db_path)
+    elif by == "model":
+        frame = per_model(db_path)
+    else:
+        raise typer.BadParameter("must be 'project' or 'model'", param_hint="--by")
     typer.echo(frame)
 
 
