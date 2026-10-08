@@ -5,6 +5,14 @@ Last updated: 2026-10-08 (ADR 0008 subagent row keys, long-prompt pricing tiers,
 
 ## Current Baseline
 
+- **Pricing table now carries explicit cache rates and Haiku 5.5's long-prompt tier**
+  (2026-10-08, regenerated from the workspace model catalog). Correction: for
+  `claude-sonnet-5-5` the cache-read rate was the 0.1x default ($0.20/MTok) but the
+  published rate is 0.05x ($0.10/MTok), so Sonnet 5.5 cache-read cost was overstated
+  by roughly half. Rows with a surviving transcript are recomputed by the nightly
+  ingest; rows without one keep the old (higher) figure. Other models' cache rates
+  were already equal to the defaults.
+
 - **Subagent spend now reaches the ledger** (2026-10-08, ADR 0008, closes ADR 0007
   follow-up #1): subagent transcript files get a `:subagent:<file stem>` suffix on
   their row key, so they no longer overwrite the parent. Measured on copies of the

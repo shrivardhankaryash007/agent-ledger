@@ -142,3 +142,13 @@ def test_loader_rejects_a_non_numeric_tier_value(
 
 def test_the_shipped_table_still_loads() -> None:
     assert "claude-sonnet-5-5" in load_pricing()
+
+
+def test_the_shipped_table_prices_a_long_haiku_call_at_the_long_rate() -> None:
+    prices = load_pricing()
+    haiku = prices["claude-haiku-5-5"]
+    assert haiku.long_prompt_threshold == 100_000
+    short = cost_usd("claude-haiku-5-5", 50_000, 0, prices)
+    long_ = cost_usd("claude-haiku-5-5", 150_000, 0, prices)
+    assert short == pytest.approx(50_000 / 1000 * 0.0001)
+    assert long_ == pytest.approx(150_000 / 1000 * 0.0005)

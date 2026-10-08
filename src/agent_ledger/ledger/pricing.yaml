@@ -3,26 +3,26 @@
 # Do not hand-edit; update model-catalog.json and re-run ledger-sync.
 version: 4
 skus:
-  claude-fable-5-1: { input: 0.01, output: 0.05, cache_read: 0.00025, vendor: anthropic }
-  claude-fable-5: { input: 0.01, output: 0.05, vendor: anthropic }
-  claude-opus-5-5: { input: 0.004, output: 0.02, cache_read: 0.0002, vendor: anthropic }
-  claude-opus-5: { input: 0.005, output: 0.025, vendor: anthropic }
-  claude-opus-4-8: { input: 0.005, output: 0.025, vendor: anthropic }
-  claude-opus-4-7: { input: 0.005, output: 0.025, vendor: anthropic }
-  claude-sonnet-5-5: { input: 0.002, output: 0.01, vendor: anthropic }
-  claude-sonnet-5: { input: 0.002, output: 0.01, vendor: anthropic }
-  claude-sonnet-4-6: { input: 0.003, output: 0.015, vendor: anthropic }
-  claude-haiku-4-5: { input: 0.001, output: 0.005, vendor: anthropic }
+  claude-fable-5-1: { input: 0.01, output: 0.05, cache_read: 0.00025, cache_write: 0.0125, vendor: anthropic }
+  claude-fable-5: { input: 0.01, output: 0.05, cache_read: 0.001, cache_write: 0.0125, vendor: anthropic }
+  claude-opus-5-5: { input: 0.004, output: 0.02, cache_read: 0.0002, cache_write: 0.005, vendor: anthropic }
+  claude-opus-5: { input: 0.005, output: 0.025, cache_read: 0.0005, cache_write: 0.00625, vendor: anthropic }
+  claude-opus-4-8: { input: 0.005, output: 0.025, cache_read: 0.0005, cache_write: 0.00625, vendor: anthropic }
+  claude-opus-4-7: { input: 0.005, output: 0.025, cache_read: 0.0005, cache_write: 0.00625, vendor: anthropic }
+  claude-sonnet-5-5: { input: 0.002, output: 0.01, cache_read: 0.0001, cache_write: 0.0025, vendor: anthropic }
+  claude-sonnet-5: { input: 0.002, output: 0.01, cache_read: 0.0002, cache_write: 0.0025, vendor: anthropic }
+  claude-sonnet-4-6: { input: 0.003, output: 0.015, cache_read: 0.0003, cache_write: 0.00375, vendor: anthropic }
+  claude-haiku-4-5: { input: 0.001, output: 0.005, cache_read: 0.0001, cache_write: 0.00125, vendor: anthropic }
   claude-haiku-4-5-20251001: { input: 0.001, output: 0.005, vendor: anthropic }
   GPT-5.5: { input: 0.005, output: 0.03, vendor: openai }
   GPT-5.4: { input: 0.0025, output: 0.015, vendor: openai }
-  gpt-6-astra: { input: 0.01, output: 0.05, vendor: openai }
-  gpt-6.1-sol: { input: 0.002, output: 0.01, vendor: openai }
-  gpt-6-sol: { input: 0.002, output: 0.01, vendor: openai }
-  gpt-6-luna: { input: 0.0001, output: 0.0005, vendor: openai }
-  gpt-5.6-sol: { input: 0.004, output: 0.02, vendor: openai }
-  gpt-5.6-terra: { input: 0.002, output: 0.012, vendor: openai }
-  gpt-5.6-luna: { input: 0.0002, output: 0.0012, vendor: openai }
+  gpt-6-astra: { input: 0.01, output: 0.05, cache_read: 0.001, cache_write: 0.0125, vendor: openai }
+  gpt-6.1-sol: { input: 0.002, output: 0.01, cache_read: 0.0001, cache_write: 0.0025, vendor: openai }
+  gpt-6-sol: { input: 0.002, output: 0.01, cache_read: 0.0002, cache_write: 0.0025, vendor: openai }
+  gpt-6-luna: { input: 0.0001, output: 0.0005, cache_read: 0.00001, cache_write: 0.000125, vendor: openai }
+  gpt-5.6-sol: { input: 0.004, output: 0.02, cache_read: 0.0004, cache_write: 0.005, vendor: openai }
+  gpt-5.6-terra: { input: 0.002, output: 0.012, cache_read: 0.0002, cache_write: 0.0025, vendor: openai }
+  gpt-5.6-luna: { input: 0.0002, output: 0.0012, cache_read: 0.00002, cache_write: 0.00025, vendor: openai }
   gpt-5.5: { input: 0.005, output: 0.03, vendor: openai }
   gpt-5.4: { input: 0.0025, output: 0.015, vendor: openai }
   gpt-5.3-codex: { input: 0.00175, output: 0.014, vendor: openai }
@@ -46,4 +46,4 @@ skus:
   gpt-oss:20b: { input: 0, output: 0, vendor: ollama }
   gemma4:latest: { input: 0, output: 0, vendor: ollama }
   nomic-embed-text:latest: { input: 0, output: 0, vendor: ollama }
-  claude-haiku-5-5: { input: 0.0001, output: 0.0005, cache_read: 0.00001, cache_write: 0.000125, vendor: anthropic }
+  claude-haiku-5-5: { input: 0.0001, output: 0.0005, cache_read: 0.00001, cache_write: 0.000125, long_prompt_threshold: 100000, long_input: 0.0005, long_output: 0.0025, long_cache_read: 0.00005, long_cache_write: 0.000625, vendor: anthropic }
