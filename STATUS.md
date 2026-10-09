@@ -10,7 +10,7 @@ head: d699215
 ## Current Slice
 
 - req: Recovery Loop v1 Packet 4 (Packets 1-3 done 2026-07-18, ADR 0004); latest landed work: ADR 0008 subagent row keys, long-prompt pricing tiers, `report --by model` (2026-10-08)
-- state: Packet 4 not started; M0 attribution kill-criterion status needs owner confirmation (see Known Gaps)
+- state: Packet 4 not started; M0 attribution fixed by ADR 0005 (2026-08-02)
 - owner: owner
 - goal: Local-first token/cost ledger plus verified recovery console. M0, M1, M2 built and verified on real data; M3.a, M3.b done.
 
@@ -39,7 +39,6 @@ head: d699215
 
 ## Known Gaps
 
-- Owner rescope decision on the M0 attribution kill-criterion (>=80% per-project attribution) is flagged as pending in the workspace AGENTS.md. This repo's old STATUS recorded it as fixed by ADR 0005 on 2026-08-02 (98.5% of cost with recorded cwd resolves; ~26% of full-corpus cost is irreplaceable pre-fix legacy). No pending-decision text exists in this repo's AGENTS.md. Next: owner confirms whether ADR 0005 closes the criterion.
 - 310 rows ($2,162.20, `model_version` < 4) lack surviving transcripts and stay overstated; rows without transcript keep the old higher Sonnet 5.5 cache-read cost.
 - Public YouTube demo (under 3 min) not available; final Devpost submission deferred.
 - Packet 4 needs multi-provider installed-wheel demo, descendant-process and interrupted-write fault injection, final browser receipt states, physical-keyboard pass (in-app browser automation did not synthesize native Enter activation). Gemini deferred.
