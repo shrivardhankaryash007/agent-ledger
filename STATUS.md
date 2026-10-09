@@ -20,9 +20,6 @@ head: d699215
 - Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
 - Real ledger re-ingest on copies (ADR 0008) -> +$128.62 equal to 36 subagent rows ($128.63), no double count / 2026-10-08
 - Production re-ingest after ADR 0007 dedupe fix -> total $2,923.71 -> $2,504.79 (443 rows) / 2026-10-02
-- Attribution v2 on production data -> two consecutive ingests identical; 98.5% of cost with recorded cwd resolves via git / 2026-08-02
-- Not re-run on 2026-10-10 (status migration only)
-
 ## Dirty / In-Flight
 
 - none
@@ -51,5 +48,5 @@ head: d699215
 
 ## Cold History
 
-- archive: `docs/archive/status-history-through-2026-10-10.md` (SHA-256 `1d7e6baeb884ff3c64f1b5c7b43b47db1445b3f1e327c0bc1f560fa51ef8ad91`)
+- archive: `docs/archive/status/2026-10.md` (SHA-256 `dffd369987373ac5a2f8cb0b5f5d873bc7d6f6200b7089f0569e73a9d04b4454`)
 - commits: `git log -- STATUS.md`
