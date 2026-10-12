@@ -89,3 +89,73 @@ def per_model(db_path: Path) -> pl.DataFrame:
             descending=[True, False, False],
         )
     )
+
+
+CONTEXT_BANDS: tuple[str, ...] = (
+    "no-cache-data",
+    "<50k",
+    "50-100k",
+    "100-200k",
+    "200k+",
+)
+
+
+def _context_band(cache_read_tokens: int, calls: int) -> str:
+    """Return the band for one row's mean cached context per call."""
+
+    if cache_read_tokens <= 0:
+        return "no-cache-data"
+    mean = cache_read_tokens / max(calls, 1)
+    if mean < 50_000:
+        return "<50k"
+    if mean < 100_000:
+        return "50-100k"
+    if mean < 200_000:
+        return "100-200k"
+    return "200k+"
+
+
+def per_context_band(db_path: Path) -> pl.DataFrame:
+    """Return rows, calls, cost and cost share grouped by mean cached context.
+
+    Mean cached context per call is the best available predictor of cost
+    (every turn re-sends it). Rows with no cached tokens are reported in a
+    separate `no-cache-data` band — unavailable telemetry is never a small
+    context.
+
+    Args:
+        db_path: SQLite ledger database path.
+
+    Returns:
+        A frame with one row per band in `CONTEXT_BANDS` order, columns
+        `band`, `rows`, `calls`, `cost_usd`, `cost_share_pct`.
+    """
+    records = all_records(db_path)
+    bands = [_context_band(r.cache_read_tokens, r.calls) for r in records]
+    frame = pl.DataFrame(
+        {
+            "band": bands,
+            "calls": [r.calls for r in records],
+            "cost_usd": [r.cost_usd for r in records],
+        },
+        schema={"band": pl.String, "calls": pl.Int64, "cost_usd": pl.Float64},
+    )
+    grouped = frame.group_by("band").agg(
+        pl.len().alias("rows"),
+        pl.col("calls").sum(),
+        pl.col("cost_usd").sum(),
+    )
+    full = (
+        pl.DataFrame({"band": list(CONTEXT_BANDS)})
+        .join(grouped, on="band", how="left")
+        .with_columns(
+            pl.col("rows").fill_null(0).cast(pl.Int64),
+            pl.col("calls").fill_null(0).cast(pl.Int64),
+            pl.col("cost_usd").fill_null(0.0),
+        )
+    )
+    total = float(full["cost_usd"].sum())
+    share = pl.col("cost_usd") / total * 100.0 if total > 0 else pl.lit(0.0)
+    return full.with_columns(share.alias("cost_share_pct")).select(
+        "band", "rows", "calls", "cost_usd", "cost_share_pct"
+    )
