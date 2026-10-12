@@ -8,6 +8,7 @@ import secrets
 import shutil
 import tempfile
 import webbrowser
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -40,6 +41,7 @@ from agent_ledger.recovery.package import (
 )
 from agent_ledger.recovery.prompt import render_recovery_prompt
 from agent_ledger.recovery.receipts import ReceiptStore, run_verification
+from agent_ledger.report.context_check import context_check
 from agent_ledger.report.spend import per_context_band, per_model, per_project
 from agent_ledger.resume.detector import detect_ending
 from agent_ledger.resume.extractor import extract_packet
@@ -203,6 +205,19 @@ def report(db_path: Path = DEFAULT_DB_PATH, by: str = "project") -> None:
             "must be 'project', 'model' or 'context'", param_hint="--by"
         )
     typer.echo(frame)
+
+
+@app.command("context-check")
+def context_check_command(
+    db_path: Path = DEFAULT_DB_PATH, split: str = "2026-10-12"
+) -> None:
+    """Print whether the 200k+ context cost share fell after the nudge went live.
+
+    Always exits 0: the verdict is a flag for the owner, not a gate.
+    """
+
+    moment = datetime.fromisoformat(split).replace(tzinfo=UTC)
+    typer.echo(context_check(db_path, moment).summary())
 
 
 @app.command()

@@ -3,6 +3,7 @@ dataclasses/frames — no formatting decisions belong in this module."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import polars as pl
@@ -115,7 +116,9 @@ def _context_band(cache_read_tokens: int, calls: int) -> str:
     return "200k+"
 
 
-def per_context_band(db_path: Path) -> pl.DataFrame:
+def per_context_band(
+    db_path: Path, since: datetime | None = None, until: datetime | None = None
+) -> pl.DataFrame:
     """Return rows, calls, cost and cost share grouped by mean cached context.
 
     Mean cached context per call is the best available predictor of cost
@@ -125,12 +128,18 @@ def per_context_band(db_path: Path) -> pl.DataFrame:
 
     Args:
         db_path: SQLite ledger database path.
+        since: Keep only rows with `ts >= since` (timezone-aware), if given.
+        until: Keep only rows with `ts < until` (timezone-aware), if given.
 
     Returns:
         A frame with one row per band in `CONTEXT_BANDS` order, columns
         `band`, `rows`, `calls`, `cost_usd`, `cost_share_pct`.
     """
-    records = all_records(db_path)
+    records = [
+        r
+        for r in all_records(db_path)
+        if (since is None or r.ts >= since) and (until is None or r.ts < until)
+    ]
     bands = [_context_band(r.cache_read_tokens, r.calls) for r in records]
     frame = pl.DataFrame(
         {
