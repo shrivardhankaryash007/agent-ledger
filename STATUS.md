@@ -17,6 +17,7 @@ head: d699215
 ## Verified Baseline
 
 - `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 100 tests / 86.24% coverage / 2026-08-02
+- `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
 - Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
 - Real ledger re-ingest on copies (ADR 0008) -> +$128.62 equal to 36 subagent rows ($128.63), no double count / 2026-10-08
 - Production re-ingest after ADR 0007 dedupe fix -> total $2,923.71 -> $2,504.79 (443 rows) / 2026-10-02
