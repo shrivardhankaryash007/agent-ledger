@@ -20,8 +20,6 @@ head: d699215
 - `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
 - `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
 - Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
-- Real ledger re-ingest on copies (ADR 0008) -> +$128.62 equal to 36 subagent rows ($128.63), no double count / 2026-10-08
-- Production re-ingest after ADR 0007 dedupe fix -> total $2,923.71 -> $2,504.79 (443 rows) / 2026-10-02
 ## Dirty / In-Flight
 
 - none
@@ -50,5 +48,5 @@ head: d699215
 
 ## Cold History
 
-- archive: `docs/archive/status/2026-10.md` (SHA-256 `dffd369987373ac5a2f8cb0b5f5d873bc7d6f6200b7089f0569e73a9d04b4454`)
+- archive: `docs/archive/status/2026-10.md` (SHA-256 `8eb5dfbe33917ebcf9f8c1031147de801f1fa80164539e7fc7cf00e6df28821b`)
 - commits: `git log -- STATUS.md`
