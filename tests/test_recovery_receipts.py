@@ -16,10 +16,12 @@ from agent_ledger.recovery.discovery import AdapterRoot, discover_sessions
 from agent_ledger.recovery.models import (
     HandoffStatus,
     ReceiptApplicability,
+    RecoveryBrief,
     RecoveryPackage,
     VerificationOutcome,
 )
 from agent_ledger.recovery.package import (
+    ConcurrentRepositoryDriftError,
     assemble_recovery_package,
     recovery_brief_digest,
 )
@@ -289,3 +291,78 @@ def test_recovery_package_reports_missing_then_current_and_checks_components(
     tampered["component_checksums"]["prompt"] = "0" * 64
     with pytest.raises(ValidationError):
         RecoveryPackage.model_validate(tampered)
+
+
+def test_verification_kills_descendant_process_on_timeout(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+
+    descendant_code = (
+        "import subprocess, sys, time\n"
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        "time.sleep(60)\n"
+    )
+    timed_out = run_verification(
+        repo=repo,
+        candidate_id="ses-test",
+        brief_digest="f" * 64,
+        owner_label="descendant timeout",
+        argv=(sys.executable, "-c", descendant_code),
+        timeout_seconds=0.2,
+    )
+
+    assert timed_out.outcome is VerificationOutcome.timeout
+    assert timed_out.exit_code is None
+
+
+def test_receipt_store_interrupted_write_cleans_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = ReceiptStore(tmp_path / "private-store")
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    receipt = run_verification(
+        repo=repo,
+        candidate_id="ses-test",
+        brief_digest="g" * 64,
+        owner_label="interrupted write",
+        argv=(sys.executable, "-c", "pass"),
+        timeout_seconds=5,
+    )
+
+    def _failing_replace(
+        src: os.PathLike[str] | str, dst: os.PathLike[str] | str
+    ) -> None:
+        raise OSError("simulated write interruption before rename")
+
+    monkeypatch.setattr(os, "replace", _failing_replace)
+    with pytest.raises(OSError, match="simulated write interruption"):
+        store.save(receipt)
+
+    assert list(store.root.glob(".receipt-*")) == []
+    assert list(store.root.glob("rcp-*.json")) == []
+
+
+def test_assemble_recovery_package_raises_on_concurrent_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = tmp_path / "repo"
+    _init_repo(repo)
+    catalog, candidate_id = _catalog(repo, tmp_path / "sessions")
+    store = ReceiptStore(tmp_path / "receipts")
+
+    original_recover = catalog.recover
+
+    def _drift_and_recover(c_id: str) -> RecoveryBrief:
+        (repo / "tracked.txt").write_text(
+            "concurrent content drift\n", encoding="utf-8"
+        )
+        return original_recover(c_id)
+
+    monkeypatch.setattr(catalog, "recover", _drift_and_recover)
+    with pytest.raises(ConcurrentRepositoryDriftError):
+        assemble_recovery_package(
+            catalog=catalog,
+            candidate_id=candidate_id,
+            store=store,
+        )

@@ -1,0 +1,5 @@
+{"timestamp":"2026-07-18T00:00:00Z","type":"session_meta","payload":{"id":"buildweek-codex-recovery-demo","cwd":"__DEMO_REPO__","timestamp":"2026-07-18T00:00:00Z","source":"codex"}}
+{"timestamp":"2026-07-18T00:00:01Z","type":"event_msg","payload":{"type":"user_message","message":"Make the verification signal honest after an interrupted Codex coding session."}}
+{"timestamp":"2026-07-18T00:00:02Z","type":"response_item","payload":{"type":"custom_tool_call","call_id":"call_demo_edit","name":"exec","status":"completed","input":"python -c \"open('src/check.py', 'w').write('VERIFICATION_STATE = \\'after\\'\\n')\""}}
+{"timestamp":"2026-07-18T00:00:03Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_demo_edit","output":"Synthetic edit applied."}}
+{"timestamp":"2026-07-18T00:00:04Z","type":"response_item","payload":{"type":"custom_tool_call","call_id":"call_demo_verify","name":"exec","status":"completed","input":"pytest -q"}}

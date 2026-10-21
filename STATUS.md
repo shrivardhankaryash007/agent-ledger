@@ -1,7 +1,7 @@
 ---
 status_version: 2
 project: agent-ledger
-updated: 2026-10-10
+updated: 2026-10-22
 head: d699215
 ---
 
@@ -9,14 +9,14 @@ head: d699215
 
 ## Current Slice
 
-- req: Recovery Loop v1 Packet 4 (Packets 1-3 done 2026-07-18, ADR 0004); latest landed work: ADR 0008 subagent row keys, long-prompt pricing tiers, `report --by model` (2026-10-08)
-- state: Packet 4 not started; M0 attribution fixed by ADR 0005 (2026-08-02)
-- owner: owner
-- goal: Local-first token/cost ledger plus verified recovery console. M0, M1, M2 built and verified on real data; M3.a, M3.b done.
+- req: Recovery Loop v1 Packet 4 (Packets 1-4 done 2026-10-22, ADR 0004); latest landed work: Packet 4 credible demo, Codex fixture, package verification helper, fault-injection gates, and built-wheel smoke
+- state: Packet 4 complete and verified; full gate green (150 tests pass, 87.31% coverage, ruff + mypy --strict pass)
+- owner: Antigravity
+- goal: Local-first token/cost ledger plus verified recovery console. M0–M3 complete and verified.
 
 ## Verified Baseline
 
-- `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 100 tests / 86.24% coverage / 2026-08-02
+- `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 150 tests / 87.31% coverage / 2026-10-22
 - `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
 - `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
 - Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
@@ -38,15 +38,15 @@ head: d699215
 
 - 310 rows ($2,162.20, `model_version` < 4) lack surviving transcripts and stay overstated; rows without transcript keep the old higher Sonnet 5.5 cache-read cost.
 - Public YouTube demo (under 3 min) not available; final Devpost submission deferred.
-- Packet 4 needs multi-provider installed-wheel demo, descendant-process and interrupted-write fault injection, final browser receipt states, physical-keyboard pass (in-app browser automation did not synthesize native Enter activation). Gemini deferred.
+- In-app browser automation did not synthesize native Enter activation; physical-keyboard pass remains for visual testing. Gemini adapter deferred.
 - `data/ledger.db.pre-backfill-2026-08-02.bak` (gitignored) is safe to delete after review; `scripts/backfill_labels.py` was a one-off, not a recurring tool.
 
 ## Next Action
 
-- Implement Recovery Loop v1 Packet 4: extend the disposable demo across Inbox -> Brief -> Receipt -> Package, add the remaining fault-injection gates, verify the built wheel and physical keyboard path, then refresh README and handoff evidence.
-  - Deferred: public demo video, M3.c passive dogfood, attribution rescope, Penny capture integration.
+- Public demo video (under 3 min), M3.c passive dogfood, attribution rescope, and Penny capture integration.
 
 ## Cold History
 
 - archive: `docs/archive/status/2026-10.md` (SHA-256 `8eb5dfbe33917ebcf9f8c1031147de801f1fa80164539e7fc7cf00e6df28821b`)
+- sessions: workspace `python3 scripts/session_index.py tail --lines 5`
 - commits: `git log -- STATUS.md`
