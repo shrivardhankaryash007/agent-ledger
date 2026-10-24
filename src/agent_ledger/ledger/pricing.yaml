@@ -36,10 +36,13 @@ skus:
   gemini-3.1-flash-lite: { input: 0.00025, output: 0.0015, vendor: google }
   gemini-3.1-flash-lite-preview: { input: 0.00025, output: 0.0015, vendor: google }
   grok-4.7: { input: 0.002, output: 0.006, vendor: xai }
+  grok-4.6: { input: 0.002, output: 0.006, vendor: xai }
+  grok-4.5: { input: 0.002, output: 0.006, vendor: xai }
   grok-4.3: { input: 0.00125, output: 0.0025, vendor: xai }
   grok-build-0.1: { input: 0.001, output: 0.002, vendor: xai }
   grok-4.20-0309-reasoning: { input: 0.00125, output: 0.0025, vendor: xai }
   grok-4.20-0309-non-reasoning: { input: 0.00125, output: 0.0025, vendor: xai }
+  grok-4.20-multi-agent-0309: { input: 0.00125, output: 0.0025, vendor: xai }
   llama3.2:latest: { input: 0, output: 0, vendor: ollama }
   llama3.1:8b: { input: 0, output: 0, vendor: ollama }
   qwen2.5-coder:14b: { input: 0, output: 0, vendor: ollama }

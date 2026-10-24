@@ -1,7 +1,7 @@
 ---
 status_version: 2
 project: agent-ledger
-updated: 2026-10-22
+updated: 2026-10-25
 head: d699215
 ---
 
@@ -16,13 +16,15 @@ head: d699215
 
 ## Verified Baseline
 
+- Pricing sync (2026-10-25): generated YAML now includes the three missing catalog rows; `model_catalog.py ledger-sync --check` passes; focused pricing tests 12 pass. Full gate passes: 150 tests / 87.31% coverage, Ruff/format and mypy. Disposable server/wheel checks rerun with host loopback/cache permissions after sandbox refusal. No core schema or historical record changes.
+
 - `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 150 tests / 87.31% coverage / 2026-10-22
 - `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
 - `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
 - Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
 ## Dirty / In-Flight
 
-- none
+- `.code_graph/` | generated cache; preserve
 
 ## Decisions / Pointers
 
