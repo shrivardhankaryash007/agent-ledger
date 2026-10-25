@@ -21,7 +21,6 @@ head: d699215
 - `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 150 tests / 87.31% coverage / 2026-10-22
 - `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
 - `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
-- Same gate after ADR 0008 / pricing-tier work -> 136 tests pass / 2026-10-08
 ## Dirty / In-Flight
 
 - `.code_graph/` | generated cache; preserve
@@ -49,6 +48,6 @@ head: d699215
 
 ## Cold History
 
-- archive: `docs/archive/status/2026-10.md` (SHA-256 `8eb5dfbe33917ebcf9f8c1031147de801f1fa80164539e7fc7cf00e6df28821b`)
+- archive: `docs/archive/status/2026-10.md` (SHA-256 `0059c369c5610aa8870458928f6538e446f329235f7366c39d388c27688a8f4e`)
 - sessions: workspace `python3 scripts/session_index.py tail --lines 5`
 - commits: `git log -- STATUS.md`
