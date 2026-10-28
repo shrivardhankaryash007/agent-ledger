@@ -2,7 +2,7 @@
 status_version: 2
 project: agent-ledger
 updated: 2026-10-29
-head: 3bfde79
+head: 6541f8d
 ---
 
 # agent-ledger Status
@@ -10,7 +10,7 @@ head: 3bfde79
 ## Current Slice
 
 - req: Correct modeled replay ceiling and Claude cache-write TTL cost accounting
-- state: O1/O4 implementation and verification complete; scoped commit ready for integration
+- state: O1/O4 corrections committed at 6541f8d; full gates green; awaiting coordinator integration
 - owner: Codex recovery-agent-ledger, 2026-10-29
 - goal: Exclude unsupported calls from replay savings and price 1-hour Claude cache writes at 2x effective input without changing frozen ledger/schema shape.
 
@@ -25,10 +25,7 @@ head: 3bfde79
 - `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
 ## Dirty / In-Flight
 
-- `src/agent_ledger/policy/replay.py`, `src/agent_ledger/ledger/pricing.py`, `src/agent_ledger/ingest/claude_transcripts.py` | O1/O4 correction; no core-model or schema edits
-- `tests/test_m2_replay.py`, `tests/test_m3_cache_tokens.py`, `tests/test_pricing_tiers.py`, `tests/test_m0_units.py` | regression/property coverage
-- `docs/decisions/0009-cache-ttl-pricing-and-modeled-replay-ceiling.md`, `plans/cache-ttl-and-replay-ceiling/plan.mdx`, `STATUS.md` | rationale, plan, status
-- `.code_graph/` | generated cache; preserve
+- None; the task worktree is clean at the scoped O1/O4 implementation commit.
 
 ## Decisions / Pointers
 
@@ -52,7 +49,7 @@ head: 3bfde79
 
 ## Next Action
 
-- Complete full gates, commit the scoped O1/O4 fix, then coordinate hash-checked integration; no historical data re-ingest is authorized.
+- Coordinate hash-checked integration of O1/O4 commit 6541f8d; no historical data re-ingest is authorized.
 
 ## Cold History
 
