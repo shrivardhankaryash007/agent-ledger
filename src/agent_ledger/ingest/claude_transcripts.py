@@ -63,6 +63,7 @@ class Bucket:
     out_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    cache_write_1h_tokens: int = 0
     calls: int = 0  # distinct API responses (message.id), not transcript lines
     last_ts: str = ""
 
@@ -309,9 +310,16 @@ def parse_transcript(
         # any signal that they were. It is tracked as its own field rather
         # than folded into `in_tokens`, which must keep its v1/v2 meaning.
         cache_write_tokens = _token_count(usage.get("cache_creation_input_tokens"))
+        cache_creation = usage.get("cache_creation")
+        cache_write_1h_tokens = (
+            _token_count(cache_creation.get("ephemeral_1h_input_tokens"))
+            if isinstance(cache_creation, dict)
+            else 0
+        )
         bucket.in_tokens += _token_count(usage.get("input_tokens"))
         bucket.in_tokens += cache_write_tokens
         bucket.cache_write_tokens += cache_write_tokens
+        bucket.cache_write_1h_tokens += cache_write_1h_tokens
         bucket.cache_read_tokens += _token_count(usage.get("cache_read_input_tokens"))
         bucket.out_tokens += _token_count(usage.get("output_tokens"))
         bucket.calls += 1
@@ -343,6 +351,7 @@ def parse_transcript(
                     prices,
                     cache_read_tokens=bucket.cache_read_tokens,
                     cache_write_tokens=bucket.cache_write_tokens,
+                    cache_write_1h_tokens=bucket.cache_write_1h_tokens,
                 ),
                 calls=bucket.calls,
                 repo_name=bucket.repo_name,

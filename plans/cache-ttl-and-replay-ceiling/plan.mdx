@@ -1,0 +1,40 @@
+---
+title: Correct replay ceiling and Claude cache TTL pricing
+status: complete
+owner: Codex
+created: 2026-10-29
+seats: Codex (implementation and verification)
+skills: none
+kind: plan
+localOnly: true
+---
+
+# Correct replay ceiling and Claude cache TTL pricing
+
+## Intent
+
+Fix the M2 replay ceiling so unsupported calls do not inflate modeled savings, and price Claude 1-hour prompt-cache writes at the documented 2x effective input rate.
+
+## Decision structure
+
+The replay metric is a sum over the modeled subset only:
+
+`modeled actual spend − modeled downgraded spend`
+
+For cache pricing, preserve the stored aggregate cache-write token count and the frozen `CallRecord`/repository schema. Carry the 1-hour subset only inside the transcript aggregation bucket, and pass it to `cost_usd` as an optional keyword. The 1-hour price is twice the effective input rate selected for that prompt size; 5-minute writes keep their current per-SKU rate. Historical rows remain untouched.
+
+## Skills and evidence
+
+- Skills: none directly applicable to these small accounting corrections; existing pure pricing code and acceptance tests are the relevant implementation contract.
+- Research checkpoint: read `standards/research-resources/CHECKPOINT.md` and the local project architecture. The workspace registry had no specific entry; official Anthropic prompt-caching/pricing docs were retrieved for TTL rates. The current official table states 5m writes at 1.25x and 1h writes at 2x. These are pricing inputs, not claims about historical transcript completeness.
+- Verification checks the mixed 5m/1h arithmetic, long-prompt effective rate, subset validity, aggregate token compatibility, and replay modeled-only ceiling.
+
+## Scope
+
+- `src/agent_ledger/policy/replay.py` and `tests/test_m2_replay.py`.
+- `src/agent_ledger/ledger/pricing.py`, `src/agent_ledger/ingest/claude_transcripts.py`, and focused cost/ingest property tests.
+- One ADR and this project status. No `CallRecord`, `Price`, pricing-table, database schema, or stored-data mutation.
+
+## Reversal
+
+Revert the scoped code/tests/ADR/status commit. No data migration is required. A historical re-ingest would need a separate deliberate, audited operation.

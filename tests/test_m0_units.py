@@ -137,6 +137,10 @@ def test_parse_transcript_rejects_invalid_pricing(
 @given(
     first_in=st.integers(min_value=0, max_value=1_000_000),
     second_in=st.integers(min_value=0, max_value=1_000_000),
+    first_write_5m=st.integers(min_value=0, max_value=1_000_000),
+    second_write_5m=st.integers(min_value=0, max_value=1_000_000),
+    first_write_1h=st.integers(min_value=0, max_value=1_000_000),
+    second_write_1h=st.integers(min_value=0, max_value=1_000_000),
     first_out=st.integers(min_value=0, max_value=1_000_000),
     second_out=st.integers(min_value=0, max_value=1_000_000),
 )
@@ -144,6 +148,10 @@ def test_cost_math_is_nonnegative_and_additive(
     tmp_path: Path,
     first_in: int,
     second_in: int,
+    first_write_5m: int,
+    second_write_5m: int,
+    first_write_1h: int,
+    second_write_1h: int,
     first_out: int,
     second_out: int,
 ) -> None:
@@ -157,12 +165,20 @@ def test_cost_math_is_nonnegative_and_additive(
             "timestamp": "2026-01-01T00:00:00Z",
             "message": {
                 "model": model,
-                "usage": {"input_tokens": in_tokens, "output_tokens": out_tokens},
+                "usage": {
+                    "input_tokens": in_tokens,
+                    "cache_creation_input_tokens": write_5m + write_1h,
+                    "cache_creation": {
+                        "ephemeral_5m_input_tokens": write_5m,
+                        "ephemeral_1h_input_tokens": write_1h,
+                    },
+                    "output_tokens": out_tokens,
+                },
             },
         }
-        for in_tokens, out_tokens in (
-            (first_in, first_out),
-            (second_in, second_out),
+        for in_tokens, write_5m, write_1h, out_tokens in (
+            (first_in, first_write_5m, first_write_1h, first_out),
+            (second_in, second_write_5m, second_write_1h, second_out),
         )
     ]
     path.write_text("\n".join(json.dumps(call) for call in calls), encoding="utf-8")
@@ -170,13 +186,23 @@ def test_cost_math_is_nonnegative_and_additive(
     record = parse_transcript(path)[0]
     # Rates come from the live table so a price refresh cannot break the test;
     # the property under test is additivity, not any particular price.
-    expected = (first_in + second_in) / 1000 * price.input_rate + (
-        first_out + second_out
-    ) / 1000 * price.output_rate
+    expected = (
+        (first_in + second_in) / 1000 * price.input_rate
+        + (first_write_5m + second_write_5m) / 1000 * price.cache_write_rate
+        + (first_write_1h + second_write_1h) / 1000 * (2 * price.input_rate)
+        + (first_out + second_out) / 1000 * price.output_rate
+    )
 
     assert record.cost_usd >= 0
     assert record.cost_usd == pytest.approx(expected)
-    assert record.in_tokens == first_in + second_in
+    assert record.in_tokens == (
+        first_in
+        + second_in
+        + first_write_5m
+        + second_write_5m
+        + first_write_1h
+        + second_write_1h
+    )
     assert record.out_tokens == first_out + second_out
 
 

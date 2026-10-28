@@ -99,7 +99,24 @@ def test_replay_aggregates_modeled_and_not_modeled_separately() -> None:
     assert result.modeled_share == pytest.approx(0.5)
     assert result.actual_cost_usd == pytest.approx(0.065)
     assert result.not_modeled_cost_usd == pytest.approx(0.035)
-    # ceiling savings only reflects the modeled call: 0.030 actual -> sonnet-rate alt
+    # Only modeled spend contributes: 0.030 actual -> sonnet-rate alt.
     expected_downgraded = 1000 / 1000 * 0.003 + 1000 / 1000 * 0.015
     assert result.downgraded_cost_usd == pytest.approx(expected_downgraded)
-    assert result.ceiling_savings_usd == pytest.approx(0.065 - expected_downgraded)
+    assert result.ceiling_savings_usd == pytest.approx(0.030 - expected_downgraded)
+
+
+def test_replay_all_not_modeled_has_zero_ceiling_savings() -> None:
+    record = _record(
+        capability_class="frontier_deep",
+        vendor="openai",
+        model_sku="gpt-5.5",
+        in_tokens=1000,
+        out_tokens=1000,
+        cost_usd=0.035,
+    )
+
+    result = replay([record], PRICES)
+
+    assert result.calls_not_modeled == 1
+    assert result.not_modeled_cost_usd == pytest.approx(0.035)
+    assert result.ceiling_savings_usd == pytest.approx(0.0)

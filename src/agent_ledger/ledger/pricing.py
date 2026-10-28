@@ -216,13 +216,16 @@ def cost_usd(
     *,
     cache_read_tokens: int = 0,
     cache_write_tokens: int = 0,
+    cache_write_1h_tokens: int = 0,
 ) -> float:
     """Compute cost for a model already present in ``prices``.
 
     ``in_tokens`` follows the ``CallRecord`` convention: it already *includes*
     ``cache_write_tokens``. Cache writes are therefore re-rated out of the
     base input rate rather than added on top, so passing them can never
-    double-charge. ``cache_read_tokens`` is separate volume and is added.
+    double-charge. ``cache_write_1h_tokens`` is an optional subset of all
+    cache writes; these use 2x the effective input rate. ``cache_read_tokens``
+    is separate volume and is added.
 
     The cache keyword arguments default to ``0``, which reproduces the exact
     pre-v3 result — existing callers (M1 live capture) keep working unchanged
@@ -235,6 +238,7 @@ def cost_usd(
         prices: Table from :func:`load_pricing`.
         cache_read_tokens: Tokens served from an existing prompt cache.
         cache_write_tokens: Subset of ``in_tokens`` written into the cache.
+        cache_write_1h_tokens: Subset of cache writes with a 1-hour TTL.
 
     Returns:
         Cost in USD.
@@ -251,14 +255,25 @@ def cost_usd(
         0.0033
     """
 
+    if (
+        type(cache_write_1h_tokens) is not int
+        or cache_write_1h_tokens < 0
+        or cache_write_1h_tokens > cache_write_tokens
+    ):
+        raise ValueError(
+            "1-hour cache writes must be a non-negative subset of all writes"
+        )
+
     price = prices[model]
     fresh_in_tokens = max(in_tokens - cache_write_tokens, 0)
     input_rate, output_rate, cache_read_rate, cache_write_rate = _rates_for_prompt(
         price, in_tokens + cache_read_tokens
     )
+    cache_write_5m_tokens = cache_write_tokens - cache_write_1h_tokens
     return (
         fresh_in_tokens / 1000 * input_rate
-        + cache_write_tokens / 1000 * cache_write_rate
+        + cache_write_5m_tokens / 1000 * cache_write_rate
+        + cache_write_1h_tokens / 1000 * (2 * input_rate)
         + cache_read_tokens / 1000 * cache_read_rate
         + out_tokens / 1000 * output_rate
     )

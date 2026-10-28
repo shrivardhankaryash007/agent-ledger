@@ -67,7 +67,8 @@ class ReplayResult:
 
     @property
     def ceiling_savings_usd(self) -> float:
-        return self.actual_cost_usd - self.downgraded_cost_usd
+        modeled_actual = self.actual_cost_usd - self.not_modeled_cost_usd
+        return modeled_actual - self.downgraded_cost_usd
 
     @property
     def modeled_share(self) -> float:

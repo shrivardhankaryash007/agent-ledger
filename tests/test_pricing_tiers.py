@@ -65,6 +65,56 @@ def test_prompt_above_the_threshold_uses_every_long_rate() -> None:
     assert got == pytest.approx(expected)
 
 
+def test_one_hour_cache_writes_use_twice_the_effective_input_rate() -> None:
+    expected = (
+        (70_000 - 10_000) / 1000 * 0.1
+        + 6_000 / 1000 * 0.125
+        + 4_000 / 1000 * 0.2
+        + 3_000 / 1000 * 0.5
+    )
+    got = cost_usd(
+        "m",
+        70_000,
+        3_000,
+        {"m": BASE},
+        cache_write_tokens=10_000,
+        cache_write_1h_tokens=4_000,
+    )
+    assert got == pytest.approx(expected)
+
+
+def test_one_hour_cache_writes_use_long_effective_input_rate() -> None:
+    expected = (
+        (70_000 - 10_000) / 1000 * 0.5
+        + 6_000 / 1000 * 0.625
+        + 4_000 / 1000 * 1.0
+        + 40_000 / 1000 * 0.05
+        + 3_000 / 1000 * 2.5
+    )
+    got = cost_usd(
+        "m",
+        70_000,
+        3_000,
+        {"m": BASE},
+        cache_read_tokens=40_000,
+        cache_write_tokens=10_000,
+        cache_write_1h_tokens=4_000,
+    )
+    assert got == pytest.approx(expected)
+
+
+def test_one_hour_cache_write_count_must_be_subset_of_all_writes() -> None:
+    with pytest.raises(ValueError, match="subset"):
+        cost_usd(
+            "m",
+            100,
+            0,
+            {"m": PLAIN},
+            cache_write_tokens=10,
+            cache_write_1h_tokens=11,
+        )
+
+
 def test_one_token_over_the_threshold_switches_tier() -> None:
     at = cost_usd("m", 100_000, 0, {"m": BASE})
     over = cost_usd("m", 100_001, 0, {"m": BASE})

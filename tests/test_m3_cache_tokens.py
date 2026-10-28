@@ -33,7 +33,7 @@ from agent_ledger.ledger.repository import (
 PRICED_MODEL = "claude-sonnet-5"
 
 
-def _write_transcript(path: Path, usages: list[dict[str, int]]) -> None:
+def _write_transcript(path: Path, usages: list[dict[str, object]]) -> None:
     """Write a minimal JSONL transcript containing one assistant line per usage."""
 
     lines = [
@@ -81,6 +81,34 @@ def test_parse_transcript_captures_cache_read_tokens(tmp_path: Path) -> None:
     # breakdown of it, deliberately redundant. Do not "clean this up".
     assert record.in_tokens == 19_300
     assert record.out_tokens == 1_200
+
+
+def test_parse_transcript_prices_one_hour_cache_writes_at_two_x_input(
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "sess-cache-ttl.jsonl"
+    _write_transcript(
+        transcript,
+        [
+            {
+                "input_tokens": 0,
+                "cache_creation_input_tokens": 3_000,
+                "cache_creation": {
+                    "ephemeral_5m_input_tokens": 1_000,
+                    "ephemeral_1h_input_tokens": 2_000,
+                },
+                "cache_read_input_tokens": 0,
+                "output_tokens": 0,
+            }
+        ],
+    )
+
+    (record,) = parse_transcript(transcript)
+
+    assert record.cache_write_tokens == 3_000
+    assert record.in_tokens == 3_000
+    # Sonnet 5: 5m write = $0.0025/1K, 1h write = 2 * $0.002/1K.
+    assert record.cost_usd == pytest.approx(0.0025 + 0.008)
 
 
 def test_parse_transcript_defaults_cache_fields_to_zero(tmp_path: Path) -> None:
