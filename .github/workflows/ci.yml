@@ -10,6 +10,9 @@ jobs:
   quality:
     name: Lint, types, tests
     runs-on: ubuntu-latest
+    env:
+      NO_COLOR: "1"
+      TERM: dumb
 
     steps:
       - uses: actions/checkout@v4
