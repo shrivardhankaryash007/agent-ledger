@@ -21,8 +21,6 @@ head: 6541f8d
 - `.venv/bin/ruff format --check src/ tests/` -> 64 files already formatted; `.venv/bin/ruff check src/ tests/` -> pass; `.venv/bin/mypy --strict src` -> 40 files pass; `git diff --check` -> pass.
 
 - `.venv/bin/ruff format --check src/ tests/ && .venv/bin/ruff check src/ tests/ && .venv/bin/mypy src && .venv/bin/pytest` -> pass, 150 tests / 87.31% coverage / 2026-10-22
-- `report --by context` added (mean cached context per call; `no-cache-data` band kept separate) -> 140 tests pass / 2026-10-12
-- `context-check` (pre-registered PASS/NO-IMPROVEMENT/INSUFFICIENT) + one-shot launchd 2026-10-19 08:30 -> 145 tests pass / 2026-10-12
 ## Dirty / In-Flight
 
 - None; the task worktree is clean at the scoped O1/O4 implementation commit.
@@ -37,8 +35,6 @@ head: 6541f8d
 - ADR 0009 | Claude 1-hour cache writes priced at 2x effective input rate at ingestion; replay ceiling includes only modeled calls; no schema change or historical rewrite
 - `plans/cache-ttl-and-replay-ceiling/plan.mdx` | red-first fix and verification plan
 - ADR 0059 (workspace) | `pricing.yaml` generated from `standards/agentic-os/model-catalog.json`; Sonnet 5.5 cache-read corrected to $0.10/MTok
-- Public repo: `https://github.com/shrivardhankaryash007/agent-ledger`; Devpost draft complete but intentionally unsubmitted
-
 ## Known Gaps
 
 - 310 rows ($2,162.20, `model_version` < 4) lack surviving transcripts and stay overstated; rows without transcript keep the old higher Sonnet 5.5 cache-read cost.
@@ -53,6 +49,6 @@ head: 6541f8d
 
 ## Cold History
 
-- archive: `docs/archive/status/2026-10.md` (SHA-256 `0059c369c5610aa8870458928f6538e446f329235f7366c39d388c27688a8f4e`)
+- archive: `docs/archive/status/2026-10.md` (SHA-256 `f4e4dde5bafc47c0ede860e27226d904d83b883e76d7aa31782084a6fb75cebd`)
 - sessions: workspace `python3 scripts/session_index.py tail --lines 5`
 - commits: `git log -- STATUS.md`
