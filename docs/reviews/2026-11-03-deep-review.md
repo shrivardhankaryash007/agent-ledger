@@ -12,6 +12,7 @@
    - **Replay ignores cache reads.** Cache reads are the largest cost stream, so the "ceiling savings" figure is inflated.
    - **The nightly re-ingest can duplicate spend.** When a worktree is deleted between ingests, the same usage is stored a second time under a new key.
    - **Two attribution states collide on one primary key,** and one row silently overwrites the other.
+   **Separately, the recovery prompt can be forged from transcript content** (R1/R2). A crafted tool name or first message can inject a fake "Safe continuation order" step or leak a command line containing a secret. This breaks ADR 0003's trust boundary.
 2. **The attribution failure is mainly a method flaw, not a code bug and not a real negative result** (confidence **75**).
    - **Wrong signal.** Both rescopes changed how the *working directory* gets labelled. Neither changed the signal itself, and the working directory says where the agent process sits, not which repo the work touched.
    - **Wrong metric.** The "98.5%" in ADR 0005 that was used to close the failure measures whether a cwd resolves to *some* git repo. It does not measure whether that repo is the right project. It is also cost-weighted and leaves out rows with no cwd. On ADR 0005's own figures, the full corpus was still about 74% attributed, below the 80% line.
@@ -61,7 +62,21 @@ Severity reflects impact on the ledger's stated asset (trustworthy spend data). 
 | F13 | Low | 90 | Owner's OS username / home layout / private project names committed to a public repo | tests fixture dir + docs (see F13) |
 | F14 | Low | 90 | Additivity property test avoids the only tiered SKU; STATUS pricing pointer contradicts the table | `tests/test_m0_units.py:137-200`, `STATUS.md` |
 
-<!-- RECOVERY_FINDINGS -->
+**Recovery / resume / API findings.** A second reviewer covered these modules. I re-ran R1, R3, R4 and R7 myself, and the subagent's repro scripts were run for the rest.
+
+| # | Severity | Conf. | Finding | Location |
+|---|---|---|---|---|
+| R1 | High | 90 | Transcript-controlled strings (tool name, session id, intent) are put into the "safe" continuation prompt without escaping, so a transcript can forge `## Safe continuation order` and `Current HEAD:` lines | `recovery/assembler.py:142`, `recovery/prompt.py:41,52` |
+| R2 | Med-High | 80 | `intent` is the first user string, verbatim and unbounded. A `<bash-input>` / `<local-command-stdout>` record becomes the intent, so command text and any secret in it reach the brief, API, prompt and package | `resume/evidence.py:117`, `recovery/adapters/codex.py:113` |
+| R3 | Medium | 90 | A gitignored file the agent wrote is reported as "matches HEAD" with readiness `pass`, because `git status` hides ignored files | `recovery/git_state.py:141-157` |
+| R4 | Medium | 90 | Git pathspec magic is not disabled. A recorded path `*.py` or `:/a.py` matches real files ("`*.py` differs from HEAD") | `recovery/git_state.py:96-114,141-150` |
+| R5 | Medium | 80 | Verification detection checks `attempt.name == "Bash"`, so Codex `exec`/`shell` runs are never assessed. On the shipped Codex demo fixture: "No recorded verification attempt is available" | `recovery/assembler.py:226,369` |
+| R6 | Low-Med | 95 | Receipt and package routes return 500 on `RecoveryGitError`/`UnsafeRecoveryPathError` (for example, an untracked symlink pointing outside the repo). A non-ASCII `?token=` makes `compare_digest` raise TypeError → 500 without the CSP/no-store headers. Not an auth bypass: Host, Origin and token checks held | `api/app.py:129,215-241` |
+| R7 | Low | 95 | `.strip()` on porcelain output turns `' M'` (unstaged) into `'M '` (staged) in the hashed evidence | `recovery/git_state.py:51,157` |
+| R8 | Low | 95 | "A session intent was recorded" is always emitted, even when the intent is the "not recoverable" fallback | `recovery/assembler.py:353-366` |
+| R9 | Low | 95 | Vacuous tests: the descendant-kill test still passes when the kill is a no-op. `SmokeResult.server_stopped` is hard-coded `True` (`demo/scenario.py:303`). Every API test overrides the default Host/Origin allowlist | `tests/test_recovery_receipts.py:296-315`, `tests/test_demo_install.py` |
+
+R1 and R2 break ADR 0003 §3, which says continuation actions come only from app-authored templates and that transcript command text is never promoted. Of everything in this review, they are the most serious *security* issues. The F-series findings matter most for *data integrity*. Checked and sound: path containment (`..`, symlink escape, `/repo` vs `/repo2`), exact Git-root binding, timing-safe ASCII token comparison, no CORS, and receipts that store no argv or output.
 
 ### F1 — Long-prompt pricing tier is selected from aggregated tokens (High, 95)
 
