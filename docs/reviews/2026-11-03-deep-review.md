@@ -418,4 +418,31 @@ Honourable mention: replace `downgraded_cost` with a call to `cost_usd` on the t
 | Q8 | Is a replay number still being used for FS-2/M2.5 decisions? | If yes, pause until A2 and A21 are fixed. | 80 |
 
 ---
+
+## 6. Dependency advisories (2026-11-03)
+
+- **Method:** I sent one `POST https://api.osv.dev/v1/querybatch` covering all 89 versioned packages in `uv.lock` (the editable project excluded), then fetched each GHSA record from `api.osv.dev/v1/vulns/{id}` for severity and fixed version. No other host was contacted. PYSEC entries are omitted where they alias a listed GHSA.
+- **Reachability:**
+  - The repo imports `litellm` only for the `CustomLogger` callback base (`ingest/litellm_proxy.py`).
+  - Its own code makes **no outbound HTTP calls**, and no module imports `aiohttp`, `anyio`, `requests` or `urllib3` directly (checked by grep).
+  - "Reachable" below means reachable from this repo's own code paths. A host process that registers the callback and makes LiteLLM calls has its own exposure.
+- **Result:** 9 of 89 packages have advisories. **None is reachable from this repo's own code paths** (c 75). Two dev tools are the realistic exposure: `pytest` tmpdir handling on shared CI runners, and `virtualenv`, pulled in by `pre-commit`. Every fixed version sits inside the declared ranges in `pyproject.toml`, so `uv lock --upgrade-package <name>` resolves all of them without loosening a constraint (c 80).
+
+| package | version | advisory ID | severity (max) | affected path in this repo? | confidence |
+|---|---|---|---|---|---|
+| litellm | 1.91.0 | GHSA-7hp6-4w63-5g45, GHSA-g5ff-637f-6q2m, GHSA-3cv6-jpf6-8222 (fixed ≥1.95.0 / 1.100.4+ line) | HIGH | **No.** All three target the LiteLLM **Proxy server** (admin salt-key reuse, `vertex_ai_credentials` file read, request-body SSRF). This repo imports only `CustomLogger` and never runs the proxy. | 80 |
+| aiohttp | 3.14.1 | GHSA-2g87-pp6c-29x5, -5wr8-gcqf-gqf3, -9xw5-w5jj-pvcg, -cq5v-8q36-5273, -494j-54xm-rwp3, -6cjc-53gc-5rqm, -f9xw-jh8m-3mwq, -gx76-c99x-2c96, -mfx4-hv73-q22v, -mq44-7p77-q5h7, -pqxq-w44r-73xw (fixed 3.14.4) | HIGH | **No** for this repo. It is transitive via litellm, most advisories are **server-side**, and the console runs on uvicorn/starlette, not aiohttp. Client-side items (response parser OOB read, cookies) matter only in a host process that makes LiteLLM calls. | 75 |
+| anyio | 4.14.1 | GHSA-82r6-8w77-94w6, GHSA-3w57-8xmc-8v26, GHSA-5p39-cfhj-2xmp (fixed 4.14.2) | CRITICAL | **No.** Used by starlette/httpx for the event loop. The advisories concern `TLSStream` IDNA encoding, `run_process` `extra_groups`, and process-pool stderr. The repo uses none of these: subprocesses go through stdlib `subprocess`, and the console has no TLS. | 75 |
+| certifi | 2026.6.17 | GHSA-6q48-6c7w-9gw2 (fixed 2026.10.18) | CRITICAL | **No** for this repo, which makes no outbound TLS. It does affect any outbound HTTPS from a LiteLLM host process (httpx/requests trust store). | 80 |
+| urllib3 | 2.7.0 | GHSA-8988-9cw3-xx77, GHSA-vxq7-64xx-v4gw, GHSA-gh4c-6fx4-qh6g (fixed 2.8.0) | HIGH | **No.** Reached via requests → tiktoken → litellm (tokenizer download). There are no direct calls. | 70 |
+| multidict | 6.7.1 | GHSA-54p9-h82j-f925 (fixed 6.9.1) | MODERATE | **No.** Reference leak in set ops, transitive via aiohttp. | 85 |
+| pytest | 8.4.2 | GHSA-6w46-j5rx-g56g (fixed 9.0.3) | MODERATE | **Dev only.** Vulnerable `tmpdir` handling. Many tests use `tmp_path`, so this is relevant on shared multi-user runners, not on single-user GitHub-hosted CI. The fix is a major version bump (8 → 9), so check plugin compatibility. | 75 |
+| virtualenv | 21.5.1 | 23 GHSAs, e.g. GHSA-94p9-xgh2-xp45 (seed wheels not integrity-checked), GHSA-p58f-9548-mpm2 / -5vjq-rrrf-7h2q / -c978-59m8-c77v (activation-script command injection) (fixed 21.14.9) | HIGH | **Dev only.** Pulled in by `pre-commit`, which creates hook environments with it. Exposure is a hostile environment name or path on a developer machine, or tampered seed wheels. | 75 |
+| filelock | 3.29.5 | GHSA-v4x8-3wr5-3wq8, GHSA-69hj-f68j-2879, GHSA-j8f7-rjxc-mr56 + 6 more (fixed 4.2.1) | HIGH | **Dev/indirect only.** Pulled in by virtualenv and huggingface-hub. Multi-user lock-file symlink and truncation issues. The repo never uses filelock itself. | 75 |
+
+Caveats:
+- OSV data is as of this query, and the severities are the advisory database's own ratings, not mine.
+- "Not reachable" comes from import and usage inspection of this repo, not from running the dependencies' code paths (c 75 overall).
+
+---
 _Report only. No source, test, config or other docs file was changed. Repro scripts lived outside the repository and were not committed._
